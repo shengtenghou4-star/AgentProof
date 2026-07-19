@@ -22,6 +22,7 @@ classifiers = [
 
 [project.scripts]
 agentproof = "agentproof.cli:main"
+agentproof-import = "agentproof.import_cli:main"
 agentproof-proxy = "agentproof.proxy_cli:main"
 
 [project.optional-dependencies]
