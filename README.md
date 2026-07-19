@@ -2,7 +2,7 @@
 
 **Evidence-based verification for autonomous AI agents.**
 
-AgentProof checks whether an agent's final claims are supported by observable execution evidence. It maps completion language to tests, independently recomputed metrics, model calls, artifact hashes, health checks, acceptance policies, and reproducible reruns.
+AgentProof checks whether an agent's final claims are supported by observable execution evidence. It maps completion language to tests, independently recomputed metrics, attested model routes, artifact hashes, health checks, acceptance policies, and reproducible reruns.
 
 The project starts from a simple rule: **do not trust completion language; verify external facts.**
 
@@ -10,12 +10,13 @@ The project starts from a simple rule: **do not trust completion language; verif
 
 - atomic claim extraction and deterministic verification;
 - test, metric, model-route, artifact, deployment, and completion checks;
-- run-level detectors for grader tampering, hidden failures, stale artifacts, mock deployment evidence, unauthorized acceptance changes, seed cherry-picking, and data leakage;
+- an OpenAI-compatible route-attestation proxy that records requested and returned models without storing prompts, responses, or authorization values;
+- run-level detectors for grader tampering, hidden failures, stale artifacts, mock deployment evidence, unauthorized acceptance changes, model substitution, seed cherry-picking, and data leakage;
 - explicit acceptance policies that fail CI when required evidence is missing;
 - append-only hash-chained traces and artifact integrity manifests;
 - signed portable evidence bundles;
 - local clean-workspace replay and resource-limited Docker replay;
-- AgentProofBench with overall and per-category adversarial accuracy;
+- AgentProofBench with exact accuracy, false-accept rate, Wilson intervals, confusion matrices, and per-category results;
 - cross-run reliability aggregation;
 - OTLP/JSON import for model and tool spans;
 - dependency-free local REST API and interactive dashboard;
@@ -41,17 +42,31 @@ agentproof benchmark
 agentproof serve --host 127.0.0.1 --port 8080
 ```
 
+To attest the actual upstream model route:
+
+```bash
+agentproof-proxy \
+  --upstream https://api.example.com/v1 \
+  --provider example \
+  --trace route-evidence.jsonl \
+  --port 8787
+```
+
+Point the agent's OpenAI-compatible base URL at `http://127.0.0.1:8787`. The proxy forwards authorization but records only header names and body hashes, not secret values or prompt/response text.
+
 ## Evidence gates and adversarial detection
 
 Policies convert evidence quality into enforceable release criteria: minimum score, valid hash chain, zero contradictions, verified claim types, and concrete runtime events with equality or numeric conditions.
 
-AgentProof also scans execution records for observable gaming signals rather than waiting for the final answer to disclose them. The alpha detectors cover protected evaluator-file modifications, suppressed command failures, stale artifact reuse, mock health checks, unauthorized acceptance changes, best-seed-only reporting, and future-data leakage.
+AgentProof also scans execution records for observable gaming signals rather than waiting for the final answer to disclose them. The detectors cover protected evaluator-file modifications, suppressed command failures, stale artifact reuse, mock health checks, unauthorized acceptance changes, requested/actual model substitution, best-seed-only reporting, and future-data leakage.
 
 ## Replay, provenance, and integration
 
 Local replay copies source into a fresh temporary workspace, strips common local-state directories, reduces inherited environment variables, executes argv commands without a shell, and emits a reproducibility report.
 
 Docker replay adds network denial, capability dropping, `no-new-privileges`, memory/CPU/process limits, and disposable mounts. Evidence bundles pin responses, traces, and artifacts by SHA-256 and can be signed with HMAC-SHA256.
+
+The route proxy provides application-layer model provenance by observing the request model, provider request ID, returned model, status, latency, and cryptographic body digests. It marks substitutions and failed calls as contradictions.
 
 The local server exposes `/api/audit`, `/api/gate`, `/health`, and an interactive dashboard at `/`. It accepts inline evidence only and does not execute uploaded commands.
 
@@ -60,6 +75,7 @@ The local server exposes `/api/audit`, `/api/gate`, `/health`, and an interactiv
 ```text
 Agent final response ──> claim extraction ───────> atomic claims
 Runtime trace ─────────> event normalization ────> observed facts
+API traffic ───────────> route attestation ──────> provider/model evidence
 Runtime trace ─────────> anomaly detectors ──────> gaming findings
 Acceptance policy ─────> evidence gate ──────────> pass / fail
 Replay manifest ───────> local/container rerun ──> reproducibility evidence
@@ -70,6 +86,7 @@ API/dashboard ─────────> integration surface ────> hum
 
 ## Documentation
 
+- `docs/model-route-attestation.md`
 - `docs/threat-model.md`
 - `docs/container-replay.md`
 - `docs/benchmark.md`
@@ -78,7 +95,7 @@ API/dashboard ─────────> integration surface ────> hum
 
 ## Roadmap
 
-1. Native adapters beyond OTLP.
+1. Native transcript adapters for major coding-agent runtimes.
 2. Multi-step and paraphrase-rich benchmark expansion.
 3. ClaimForge and Major Forest case studies.
 4. Public alpha packaging and hosted demo.
@@ -93,4 +110,4 @@ pytest
 
 ## Status
 
-AgentProof is an early alpha. It is usable for deterministic evidence audits, acceptance gates, provenance verification, reproducibility checks, and local API integrations. It is not a formal security boundary.
+AgentProof is an early alpha. It is usable for deterministic evidence audits, model-route attestation, acceptance gates, provenance verification, reproducibility checks, and local API integrations. It is not a formal security boundary.
