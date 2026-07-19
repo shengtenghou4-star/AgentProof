@@ -1,0 +1,21 @@
+{
+  "minimum_score": 80,
+  "require_integrity": true,
+  "forbid_contradictions": true,
+  "max_unsupported_ratio": 0.1,
+  "required_claims": [
+    {"kind": "all_tests_passed", "status": "verified", "minimum_count": 1}
+  ],
+  "required_events": [
+    {
+      "event_type": "test_summary",
+      "minimum_count": 1,
+      "where": {"failed": 0, "errors": 0, "exit_code": 0, "total": {"gt": 0}}
+    },
+    {
+      "event_type": "artifact",
+      "minimum_count": 1,
+      "where": {"exists": true}
+    }
+  ]
+}

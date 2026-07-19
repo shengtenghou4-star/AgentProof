@@ -10,6 +10,7 @@ The project starts from a simple rule: **do not trust completion language; verif
 
 - atomic claim extraction and deterministic verification;
 - test, metric, model-route, artifact, deployment, and completion checks;
+- explicit acceptance policies that fail CI when required evidence is missing;
 - contradiction detection for inflated completion language;
 - append-only hash-chained traces;
 - artifact integrity manifests;
@@ -28,6 +29,10 @@ agentproof audit examples/sample_trace.jsonl \
   --response-file examples/sample_response.txt \
   --json agentproof-report.json \
   --html agentproof-report.html
+
+agentproof gate examples/sample_trace.jsonl examples/strict-policy.json \
+  --response-file examples/sample_response.txt \
+  --json gate-report.json
 
 agentproof record-command run.jsonl pytest -q
 agentproof manifest artifacts.json model.pkl report.json --root .
@@ -49,18 +54,20 @@ agentproof benchmark
 
 The included sample deliberately contains inflated claims: four tests failed and the deployment health check returned 503. AgentProof marks those claims as contradicted while independently verifying the recorded AUC and model route.
 
-## Evidence model
+## Acceptance policies
 
-AgentProof consumes newline-delimited JSON events and maps each extracted claim to observable evidence.
+A policy converts evidence quality into an enforceable release gate. It can require a minimum audit score, a valid hash chain, zero contradictions, specific verified claim types, and concrete runtime events with numeric or equality conditions.
 
-| Event | Key fields | Claim verified |
-|---|---|---|
-| `test_summary` | `total`, `passed`, `failed`, `errors`, `exit_code` | all tests passed |
-| `metric` | `name`, `value`, `independently_computed` | metric value |
-| `model_call` | `provider`, `model`, `request_id` | actual model route |
-| `artifact` | `path`, `exists`, `sha256` | file creation and integrity |
-| `healthcheck` | `url`, `status_code` | deployment status |
-| `command`, `tool_call` | execution metadata | completion support |
+```json
+{
+  "minimum_score": 90,
+  "forbid_contradictions": true,
+  "required_events": [
+    {"event_type": "test_summary", "where": {"total": {"gt": 0}, "failed": 0, "exit_code": 0}},
+    {"event_type": "healthcheck", "where": {"status_code": {"gte": 200, "lt": 300}}}
+  ]
+}
+```
 
 ## Replay and bundles
 
@@ -73,8 +80,9 @@ These controls are stronger than trusting saved prose or logs, but they are not 
 ## Architecture
 
 ```text
-Agent final response ──> claim extraction ──> atomic claims
+Agent final response ──> claim extraction ─> atomic claims
 Runtime trace ─────────> event normalization ─> observed facts
+Acceptance policy ─────> evidence gate ────────> pass / fail
 Replay manifest ───────> clean workspace rerun ─> reproducibility evidence
 Artifacts + trace ─────> signed evidence bundle ─> provenance evidence
                                          │
@@ -103,4 +111,4 @@ pytest
 
 ## Status
 
-AgentProof is an early alpha. It is already usable for deterministic evidence audits and reproducibility checks, but it is not yet a security boundary.
+AgentProof is an early alpha. It is already usable for deterministic evidence audits, acceptance gates, and reproducibility checks, but it is not yet a security boundary.

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentproof.dev/schemas/policy.schema.json",
+  "title": "AgentProof Acceptance Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "minimum_score": {"type": "number", "minimum": 0, "maximum": 100},
+    "require_integrity": {"type": "boolean", "default": true},
+    "forbid_contradictions": {"type": "boolean", "default": true},
+    "max_unsupported_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+    "required_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {"type": "string"},
+          "status": {"enum": ["verified", "partial", "unsupported", "contradicted"]},
+          "minimum_count": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "required_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event_type"],
+        "properties": {
+          "event_type": {"type": "string"},
+          "source": {"type": "string"},
+          "minimum_count": {"type": "integer", "minimum": 1},
+          "where": {"type": "object"}
+        }
+      }
+    }
+  }
+}

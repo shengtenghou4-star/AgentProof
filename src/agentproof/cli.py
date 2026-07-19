@@ -9,7 +9,9 @@ from .adapters import convert_otlp_json
 from .audit import audit_run
 from .benchmark import run_benchmark
 from .bundle import build_evidence_bundle, verify_evidence_bundle, write_bundle
+from .io import load_events
 from .manifest import build_manifest, verify_manifest
+from .policy import evaluate_policy, load_policy
 from .recorder import record_command
 from .replay import replay
 from .reporting import render_html
@@ -28,6 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--json", type=Path, dest="json_output")
     audit.add_argument("--html", type=Path, dest="html_output")
     audit.add_argument("--fail-under", type=float, default=None)
+
+    gate = subparsers.add_parser("gate", help="Enforce an acceptance policy against an agent run")
+    gate.add_argument("trace", type=Path)
+    gate.add_argument("policy", type=Path)
+    gate.add_argument("--response-file", type=Path, required=True)
+    gate.add_argument("--json", type=Path, dest="json_output")
 
     record = subparsers.add_parser("record-command", help="Execute a command and append tamper-evident evidence")
     record.add_argument("trace", type=Path)
@@ -87,6 +95,16 @@ def main(argv: list[str] | None = None) -> int:
             if args.fail_under is not None and report.score < args.fail_under:
                 return 2
             return 0
+        if args.command == "gate":
+            response = args.response_file.read_text(encoding="utf-8")
+            report = audit_run(args.trace, response)
+            result = evaluate_policy(report, load_events(args.trace), load_policy(args.policy))
+            payload = {"audit": report.to_dict(), "policy": result.to_dict()}
+            rendered = json.dumps(payload, indent=2, sort_keys=True)
+            if args.json_output:
+                args.json_output.write_text(rendered + "\n", encoding="utf-8")
+            print(rendered)
+            return 0 if result.passed else 5
         if args.command == "record-command":
             if not args.argv:
                 raise ValueError("record-command requires an argv command")
