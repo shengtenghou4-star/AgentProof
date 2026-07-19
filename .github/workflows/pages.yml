@@ -29,8 +29,9 @@ jobs:
       - name: Validate standalone site
         run: |
           test -f site/index.html
-          grep -q "Evidence-based verification" site/index.html
-          grep -q "Evidence boundaries" site/index.html
+          grep -q "Trust the evidence" site/index.html
+          grep -q "Evidence boundaries are part of the product" site/index.html
+          grep -q "Interactive audit" site/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
