@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from agentproof.docker_replay import build_docker_command, replay_in_docker
