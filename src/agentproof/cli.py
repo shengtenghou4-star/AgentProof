@@ -6,6 +6,7 @@ import shlex
 import sys
 from pathlib import Path
 
+from .adapters import convert_otlp_json
 from .audit import audit_run
 from .benchmark import run_benchmark
 from .manifest import build_manifest, verify_manifest
@@ -42,6 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("manifest", type=Path)
     verify.add_argument("--root", type=Path, default=Path("."))
 
+    otel = subparsers.add_parser("import-otel", help="Convert OTLP/JSON spans into AgentProof JSONL")
+    otel.add_argument("input", type=Path)
+    otel.add_argument("output", type=Path)
+
     subparsers.add_parser("benchmark", help="Run the built-in false-completion benchmark")
     return parser
 
@@ -66,6 +71,19 @@ def main(argv: list[str] | None = None) -> int:
             errors = verify_manifest(payload, root=args.root)
             print(json.dumps({"valid": not errors, "errors": errors}, indent=2))
             return int(bool(errors))
+        if args.command == "import-otel":
+            payload = json.loads(args.input.read_text(encoding="utf-8"))
+            events = convert_otlp_json(payload)
+            with args.output.open("w", encoding="utf-8") as handle:
+                for event in events:
+                    handle.write(json.dumps({
+                        "event_type": event.event_type,
+                        "timestamp": event.timestamp,
+                        "data": event.data,
+                        "source": event.source,
+                    }, sort_keys=True) + "\n")
+            print(json.dumps({"events": len(events), "output": str(args.output)}, indent=2))
+            return 0
         if args.command == "benchmark":
             result = run_benchmark()
             print(json.dumps(result, indent=2))

@@ -23,7 +23,9 @@ Current alpha capabilities:
 - append-only tamper-evident trace recorder;
 - artifact integrity manifests;
 - built-in adversarial false-completion benchmark;
-- reusable composite GitHub Action.
+- reusable composite GitHub Action;
+- OTLP/JSON import for model and tool spans;
+- published JSON Schema for evidence events.
 
 ## Quick start
 
@@ -43,6 +45,7 @@ The included sample deliberately contains inflated claims: four tests failed and
 agentproof record-command run.jsonl "pytest -q"
 agentproof manifest artifacts.json model.pkl report.json --root .
 agentproof verify-manifest artifacts.json --root .
+agentproof import-otel otlp.json run.jsonl
 agentproof benchmark
 ```
 

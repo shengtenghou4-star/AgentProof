@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentproof.dev/schemas/event.schema.json",
+  "title": "AgentProof Event",
+  "type": "object",
+  "required": ["event_type", "timestamp", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "event_type": {"type": "string", "minLength": 1},
+    "timestamp": {"type": "string", "minLength": 1},
+    "source": {"type": "string", "default": "runtime"},
+    "data": {"type": "object"}
+  }
+}
