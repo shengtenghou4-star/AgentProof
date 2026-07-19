@@ -8,10 +8,13 @@ from pathlib import Path
 from .adapters import convert_otlp_json
 from .aggregate import aggregate_reports
 from .audit import audit_run
+from .autoprofile import write_project_profile
 from .benchmark import run_benchmark
+from .benchmark_holdout import run_holdout_benchmark
 from .benchmark_variants import run_extended_benchmark
 from .bundle import build_evidence_bundle, verify_evidence_bundle, write_bundle
 from .docker_replay import replay_in_docker
+from .formats import render_junit, render_sarif
 from .io import load_events
 from .manifest import build_manifest, verify_manifest
 from .policy import evaluate_policy, load_policy
@@ -39,6 +42,8 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--run-id", default="local")
     audit.add_argument("--json", type=Path, dest="json_output")
     audit.add_argument("--html", type=Path, dest="html_output")
+    audit.add_argument("--sarif", type=Path, dest="sarif_output")
+    audit.add_argument("--junit", type=Path, dest="junit_output")
     audit.add_argument("--fail-under", type=float, default=None)
 
     gate = subparsers.add_parser("gate", help="Enforce an acceptance policy against an agent run")
@@ -112,6 +117,13 @@ def build_parser() -> argparse.ArgumentParser:
     project.add_argument("--json", type=Path, dest="json_output")
     project.add_argument("--fail-under", type=float, default=None)
 
+    init_profile = subparsers.add_parser(
+        "init-profile", help="Discover project checks and write an audit profile"
+    )
+    init_profile.add_argument("output", type=Path)
+    init_profile.add_argument("--source", type=Path, default=Path("."))
+    init_profile.add_argument("--force", action="store_true")
+
     server = subparsers.add_parser("serve", help="Run the local API and dashboard")
     server.add_argument("--host", default="127.0.0.1")
     server.add_argument("--port", type=int, default=8080)
@@ -119,7 +131,11 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark = subparsers.add_parser(
         "benchmark", help="Run false-completion benchmark suites"
     )
-    benchmark.add_argument("--suite", choices=("core", "extended"), default="core")
+    benchmark.add_argument(
+        "--suite",
+        choices=("core", "extended", "holdout", "all"),
+        default="core",
+    )
     benchmark.add_argument("--json", type=Path, dest="json_output")
     return parser
 
@@ -140,6 +156,10 @@ def main(argv: list[str] | None = None) -> int:
                 args.json_output.write_text(rendered + "\n", encoding="utf-8")
             if args.html_output:
                 args.html_output.write_text(render_html(report), encoding="utf-8")
+            if args.sarif_output:
+                args.sarif_output.write_text(render_sarif(report), encoding="utf-8")
+            if args.junit_output:
+                args.junit_output.write_text(render_junit(report), encoding="utf-8")
             print(rendered)
             if args.fail_under is not None and report.score < args.fail_under:
                 return 2
@@ -254,18 +274,42 @@ def main(argv: list[str] | None = None) -> int:
             if args.fail_under is not None and score < args.fail_under:
                 return 6
             return 0 if result.passed else 6
+        if args.command == "init-profile":
+            payload = write_project_profile(
+                args.output,
+                root=args.source,
+                overwrite=args.force,
+            )
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0
         if args.command == "serve":
             if not 1 <= args.port <= 65535:
                 raise ValueError("port must be between 1 and 65535")
             serve(args.host, args.port)
             return 0
         if args.command == "benchmark":
-            result = run_extended_benchmark() if args.suite == "extended" else run_benchmark()
+            suites = {
+                "core": run_benchmark,
+                "extended": run_extended_benchmark,
+                "holdout": run_holdout_benchmark,
+            }
+            if args.suite == "all":
+                payload = {name: runner() for name, runner in suites.items()}
+                payload["passed"] = all(
+                    result["accuracy"] == 1.0 and result["false_accepts"] == 0
+                    for result in payload.values()
+                    if isinstance(result, dict) and "accuracy" in result
+                )
+                result = payload
+                passed = bool(payload["passed"])
+            else:
+                result = suites[args.suite]()
+                passed = result["accuracy"] == 1.0 and result["false_accepts"] == 0
             rendered = json.dumps(result, indent=2, sort_keys=True)
             if args.json_output:
                 args.json_output.write_text(rendered + "\n", encoding="utf-8")
             print(rendered)
-            return 0 if result["accuracy"] == 1.0 and result["false_accepts"] == 0 else 4
+            return 0 if passed else 4
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"agentproof: {exc}", file=sys.stderr)
         return 1
