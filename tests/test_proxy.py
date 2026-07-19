@@ -1,4 +1,7 @@
 import json
+import threading
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
@@ -9,6 +12,7 @@ from agentproof.proxy import (
     build_target,
     extract_model,
     extract_request_id,
+    make_handler,
     record_route_evidence,
     sanitize_request_headers,
 )
@@ -106,3 +110,63 @@ def test_audit_detects_attested_route_substitution(tmp_path):
     kinds = {finding.claim.kind: finding.status.value for finding in report.findings}
     assert kinds["model_used"] == "contradicted"
     assert kinds["model_route_substitution"] == "contradicted"
+
+
+def test_proxy_forwards_request_and_attests_returned_model(tmp_path):
+    class UpstreamHandler(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            length = int(self.headers.get("Content-Length", "0"))
+            self.rfile.read(length)
+            body = b'{"id":"resp","model":"economy-model","choices":[]}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("X-Request-Id", "req_live")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, _format, *args):
+            return
+
+    upstream = ThreadingHTTPServer(("127.0.0.1", 0), UpstreamHandler)
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+
+    trace = tmp_path / "proxy.jsonl"
+    config = ProxyConfig(
+        upstream=f"http://127.0.0.1:{upstream.server_port}/v1",
+        trace=trace,
+        provider="fake-provider",
+    )
+    proxy = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(config))
+    proxy_thread = threading.Thread(target=proxy.serve_forever, daemon=True)
+    proxy_thread.start()
+
+    try:
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{proxy.server_port}/chat/completions",
+            data=b'{"model":"premium-model","messages":[]}',
+            headers={
+                "Authorization": "Bearer integration-secret",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read())
+        assert payload["model"] == "economy-model"
+    finally:
+        proxy.shutdown()
+        upstream.shutdown()
+        proxy.server_close()
+        upstream.server_close()
+        proxy_thread.join(timeout=5)
+        upstream_thread.join(timeout=5)
+
+    raw = trace.read_text(encoding="utf-8")
+    assert "integration-secret" not in raw
+    event = load_events(trace)[0]
+    assert event.data["request_id"] == "req_live"
+    assert event.data["requested_model"] == "premium-model"
+    assert event.data["actual_model"] == "economy-model"
+    assert event.data["route_mismatch"] is True
