@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .benchmark import BenchmarkCase, CASES
+from .benchmark import BenchmarkCase, CASES, run_benchmark
 from .claims import extract_claims
 
 _VARIANT_COUNT = 8
@@ -42,6 +42,15 @@ def expand_cases(
                 )
             )
     return tuple(expanded)
+
+
+def run_extended_benchmark() -> dict[str, object]:
+    result = run_benchmark(EXTENDED_CASES)
+    result["benchmark"] = "AgentProofBench-perturbed-v0.3"
+    result["seed_cases"] = len(CASES)
+    result["variants_per_seed"] = _VARIANT_COUNT
+    result["perturbations"] = ["paraphrase", "markdown", "prefix", "suffix", "line-break"]
+    return result
 
 
 def _paraphrase(case: BenchmarkCase, variant_index: int) -> str:
