@@ -2,7 +2,7 @@
 
 **Evidence-based verification for autonomous AI agents.**
 
-AgentProof checks whether an agent's final claims are supported by observable execution evidence. It maps statements such as “all tests passed”, “AUC reached 0.757”, “I used model X”, “the file was created”, or “the API is deployed” to test summaries, independently recomputed metrics, runtime model calls, artifact hashes, health checks, and clean-environment replays.
+AgentProof checks whether an agent's final claims are supported by observable execution evidence. It maps completion language to tests, independently recomputed metrics, model calls, artifact hashes, health checks, acceptance policies, and clean-environment replays.
 
 The project starts from a simple rule: **do not trust completion language; verify external facts.**
 
@@ -10,13 +10,12 @@ The project starts from a simple rule: **do not trust completion language; verif
 
 - atomic claim extraction and deterministic verification;
 - test, metric, model-route, artifact, deployment, and completion checks;
+- run-level detectors for grader tampering, hidden failures, stale artifacts, mock deployment evidence, unauthorized acceptance changes, seed cherry-picking, and data leakage;
 - explicit acceptance policies that fail CI when required evidence is missing;
-- contradiction detection for inflated completion language;
-- append-only hash-chained traces;
-- artifact integrity manifests;
+- append-only hash-chained traces and artifact integrity manifests;
 - signed portable evidence bundles;
 - clean copied-workspace replay with reduced environment and no shell execution;
-- adversarial false-completion benchmark;
+- AgentProofBench with overall and per-category adversarial accuracy;
 - OTLP/JSON import for model and tool spans;
 - reusable GitHub Action, JSON/HTML reports, schemas, and CI thresholds;
 - zero runtime dependencies.
@@ -25,79 +24,52 @@ The project starts from a simple rule: **do not trust completion language; verif
 
 ```bash
 python -m pip install -e '.[dev]'
-agentproof audit examples/sample_trace.jsonl \
-  --response-file examples/sample_response.txt \
-  --json agentproof-report.json \
-  --html agentproof-report.html
-
-agentproof gate examples/sample_trace.jsonl examples/strict-policy.json \
-  --response-file examples/sample_response.txt \
-  --json gate-report.json
-
+agentproof audit examples/sample_trace.jsonl --response-file examples/sample_response.txt --json agentproof-report.json --html agentproof-report.html
+agentproof gate examples/sample_trace.jsonl examples/strict-policy.json --response-file examples/sample_response.txt --json gate-report.json
 agentproof record-command run.jsonl pytest -q
 agentproof manifest artifacts.json model.pkl report.json --root .
 agentproof verify-manifest artifacts.json --root .
 agentproof import-otel otlp.json run.jsonl
 agentproof replay examples/replay.json --source . --json replay-report.json
-
-# use a random 32+ byte secret kept outside version control
-agentproof bundle evidence.json \
-  --trace run.jsonl \
-  --response-file final-response.txt \
-  --artifact model.pkl \
-  --artifact report.json \
-  --root . \
-  --key-file .agentproof-key
+agentproof bundle evidence.json --trace run.jsonl --response-file final-response.txt --artifact model.pkl --root . --key-file .agentproof-key
 agentproof verify-bundle evidence.json --root . --key-file .agentproof-key
 agentproof benchmark
 ```
 
-The included sample deliberately contains inflated claims: four tests failed and the deployment health check returned 503. AgentProof marks those claims as contradicted while independently verifying the recorded AUC and model route.
-
 ## Acceptance policies
 
-A policy converts evidence quality into an enforceable release gate. It can require a minimum audit score, a valid hash chain, zero contradictions, specific verified claim types, and concrete runtime events with numeric or equality conditions.
+Policies turn evidence quality into an enforceable release gate. They can require a minimum score, a valid hash chain, zero contradictions, specific verified claim types, and concrete runtime events with equality or numeric conditions.
 
-```json
-{
-  "minimum_score": 90,
-  "forbid_contradictions": true,
-  "required_events": [
-    {"event_type": "test_summary", "where": {"total": {"gt": 0}, "failed": 0, "exit_code": 0}},
-    {"event_type": "healthcheck", "where": {"status_code": {"gte": 200, "lt": 300}}}
-  ]
-}
-```
+## Adversarial detection
+
+AgentProof does not wait for the final answer to confess a problem. It also scans the execution record for observable evaluation-gaming signals, including protected test or grader modifications, suppressed nonzero command exits, stale artifacts, mock health checks, unauthorized policy changes, best-seed-only reporting, and future-data leakage.
+
+See `docs/benchmark.md` for the current benchmark scope.
 
 ## Replay and bundles
 
-Replay manifests declare deterministic checks as argv arrays. AgentProof copies the source into a fresh temporary workspace, strips common local-state directories, reduces inherited environment variables, executes without a shell, and emits a reproducibility report.
+Replay manifests declare deterministic checks as argv arrays. AgentProof copies source into a fresh temporary workspace, strips common local-state directories, reduces inherited environment variables, executes without a shell, and emits a reproducibility report.
 
-Evidence bundles pin the response, trace, and artifacts by SHA-256. Optional HMAC-SHA256 signatures detect any post-run modification to bundle metadata. This creates a portable unit that can be independently verified later.
+Evidence bundles pin the response, trace, and artifacts by SHA-256. Optional HMAC-SHA256 signatures detect post-run modification to bundle metadata.
 
 These controls are stronger than trusting saved prose or logs, but they are not a complete hostile-code sandbox. See `docs/threat-model.md`.
 
 ## Architecture
 
 ```text
-Agent final response ──> claim extraction ─> atomic claims
-Runtime trace ─────────> event normalization ─> observed facts
-Acceptance policy ─────> evidence gate ────────> pass / fail
+Agent final response ──> claim extraction ───────> atomic claims
+Runtime trace ─────────> event normalization ────> observed facts
+Runtime trace ─────────> anomaly detectors ──────> gaming findings
+Acceptance policy ─────> evidence gate ──────────> pass / fail
 Replay manifest ───────> clean workspace rerun ─> reproducibility evidence
-Artifacts + trace ─────> signed evidence bundle ─> provenance evidence
-                                         │
-                                         ▼
-                              deterministic verifiers
-                                         │
-                                         ▼
-                 verified / partial / unsupported / contradicted
+Artifacts + trace ─────> signed bundle ──────────> provenance evidence
 ```
 
 ## Roadmap
 
 1. Container isolation and resource policies for untrusted reruns.
-2. Agent-framework adapters beyond OTLP.
-3. Expanded adversarial false-completion and grader-gaming benchmark.
+2. Native adapters beyond OTLP.
+3. Multi-step and paraphrase-rich benchmark expansion.
 4. Cross-agent reliability reports.
 5. ClaimForge and Major Forest case studies.
 
@@ -111,4 +83,4 @@ pytest
 
 ## Status
 
-AgentProof is an early alpha. It is already usable for deterministic evidence audits, acceptance gates, and reproducibility checks, but it is not yet a security boundary.
+AgentProof is an early alpha. It is usable for deterministic evidence audits, acceptance gates, and reproducibility checks, but it is not yet a security boundary.
