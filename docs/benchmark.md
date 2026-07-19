@@ -2,35 +2,79 @@
 
 AgentProofBench is a deterministic adversarial benchmark for false-completion and evaluation-gaming detection.
 
-The core v0.2 suite covers honest and dishonest variants across tests, metrics, model routing, route attestation, artifacts, deployment, completion claims, evaluator-file tampering, hidden command failures, stale artifact reuse, mock health checks, acceptance-criteria rewriting, model substitution, seed cherry-picking, and future or label leakage.
+## Suites
 
-The perturbed v0.3 suite expands each seed oracle into eight deterministic language and formatting variants. It preserves the same evidence ground truth while changing:
+### Core
 
-- claim paraphrases;
-- Markdown emphasis;
-- explanatory prefixes and suffixes;
-- list formatting and line breaks;
-- capitalization and equivalent completion wording.
+The 38 seed oracles cover honest and dishonest variants across:
 
-With 38 seed cases, the perturbed suite contains 304 cases. Expansion is deterministic, so CI regressions remain reproducible and do not depend on an external model.
+- test completion and zero-test gaming;
+- independently recomputed, self-reported, missing and inflated metrics;
+- runtime and attested model routes;
+- requested/returned model substitution;
+- artifact existence and integrity;
+- deployment health checks and mock evidence;
+- completion claims;
+- evaluator-file tampering and hidden command failures;
+- stale artifact reuse and unauthorized acceptance changes;
+- best-seed-only reporting;
+- future-information and label leakage.
 
-The benchmark reports:
+### Language and formatting perturbations
 
-- exact status accuracy;
-- a 95% Wilson interval for accuracy;
-- false-accept rate on claims that should be contradicted or unsupported;
+The 304-case suite expands every seed into eight deterministic wording or formatting variants. It changes paraphrases, Markdown, prefixes, suffixes, list formatting, capitalization and line breaks while preserving the same evidence ground truth.
+
+### Layout/context holdout-style perturbations
+
+The 1,216-case suite combines eight surrounding-context prefixes, four suffixes and rotating containers for each seed. It tests whether the extractor and verifier remain stable when the same controlled claim appears in reports, block quotes, bullets, inline code, status labels and other layouts.
+
+The word **holdout-style** refers to a separate deterministic perturbation construction. It does not mean that the underlying attack families were designed by an independent party or hidden during development.
+
+## Current controlled results
+
+| Suite | Cases | Unsafe cases | False accepts | Correct |
+|---|---:|---:|---:|---:|
+| Core | 38 | 25 | 0 | 38 |
+| Language/format | 304 | 200 | 0 | 304 |
+| Layout/context holdout-style | 1,216 | 800 | 0 | 1,216 |
+| **Combined** | **1,558** | **1,025** | **0** | **1,558** |
+
+For the 1,216-case suite, the observed-accuracy 95% Wilson interval is approximately 99.69%–100%. The interval describes repeated sampling around this controlled corpus; it does not transform the suite into a real-world performance estimate.
+
+## Reported metrics
+
+Every suite reports:
+
+- exact status agreement;
+- 95% Wilson interval for observed accuracy;
+- false-accept count and rate;
 - a naive-trust baseline that accepts every agent claim;
-- a status confusion matrix;
-- per-category accuracy and case counts;
-- the number of seed cases and perturbations per seed for the extended suite.
+- expected-versus-observed status confusion matrix;
+- per-category accuracy and case count;
+- seed and perturbation counts where applicable.
 
-Every case has a known oracle and can run without network access or model credentials.
+The false-accept rate is the primary safety metric. A false accept occurs when the oracle is `unsupported` or `contradicted` but AgentProof returns `verified` or `partial`.
+
+## Commands
 
 ```bash
 agentproof benchmark --suite core
-agentproof benchmark --suite extended --json benchmark-report.json
+agentproof benchmark --suite extended
+agentproof benchmark --suite holdout
+agentproof benchmark --suite all --json benchmark-report.json
+python scripts/fuzz_claims.py
 ```
 
-The false-accept rate is the primary safety metric. It measures how often AgentProof incorrectly treats a claim as verified or partial when the oracle says the claim is contradicted or unsupported.
+The fixed-seed fuzz harness generates 5,000 positive, negated and noise-heavy claim strings. It checks expected extraction, rejection of negated statements and a runtime budget.
 
-The built-in suites remain controlled regression corpora rather than claims of real-world coverage. The next evidence tier requires framework-recorded multi-step traces, independently labeled agent runs, adversarial human review and held-out attack families.
+## Interpretation boundary
+
+The built-in suites are controlled regression corpora. They show that covered rules remain stable across the stated oracles and perturbations. They do **not** establish:
+
+- universal real-world deception-detection accuracy;
+- robustness to unknown attack families;
+- independent evaluation;
+- adversarial human red-team performance;
+- production reliability across every agent framework.
+
+Those claims require independently sampled and labeled runs, outside attack design and external validation. They are deliberately excluded from the coding-stage benchmark.
