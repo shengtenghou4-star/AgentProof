@@ -1,0 +1,25 @@
+name: AgentProof Audit
+description: Audit an AI agent final response against a JSONL evidence trace
+inputs:
+  trace:
+    description: Path to the AgentProof JSONL trace
+    required: true
+  response-file:
+    description: Path to the agent final response
+    required: true
+  fail-under:
+    description: Minimum evidence score
+    required: false
+    default: "80"
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: python -m pip install "${{ github.action_path }}"
+    - shell: bash
+      run: >-
+        agentproof audit "${{ inputs.trace }}"
+        --response-file "${{ inputs.response-file }}"
+        --fail-under "${{ inputs.fail-under }}"
+        --json agentproof-report.json
+        --html agentproof-report.html

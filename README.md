@@ -19,7 +19,11 @@ Current alpha capabilities:
 - optional hash-chain trace integrity checks;
 - JSON and standalone HTML audit reports;
 - CI threshold support through `--fail-under`;
-- zero runtime dependencies.
+- zero runtime dependencies;
+- append-only tamper-evident trace recorder;
+- artifact integrity manifests;
+- built-in adversarial false-completion benchmark;
+- reusable composite GitHub Action.
 
 ## Quick start
 
@@ -32,6 +36,15 @@ agentproof audit examples/sample_trace.jsonl \
 ```
 
 The included sample deliberately contains inflated claims: four tests failed and the deployment health check returned 503. AgentProof marks those claims as contradicted while independently verifying the recorded AUC and model route.
+
+## Recording evidence
+
+```bash
+agentproof record-command run.jsonl "pytest -q"
+agentproof manifest artifacts.json model.pkl report.json --root .
+agentproof verify-manifest artifacts.json --root .
+agentproof benchmark
+```
 
 ## Event format
 
@@ -67,7 +80,7 @@ Runtime trace ─────────> event normalization ─> observed fac
 
 ## Roadmap
 
-1. Signed evidence bundles and reproducible replay manifests.
+1. Cryptographically signed evidence bundles and reproducible replay manifests.
 2. OpenTelemetry and agent-framework adapters.
 3. Sandboxed reruns for tests, metrics, and artifacts.
 4. Adversarial false-completion and grader-gaming benchmark.
