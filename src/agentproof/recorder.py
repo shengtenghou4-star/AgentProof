@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -10,6 +11,11 @@ from typing import Any, Sequence
 
 from .integrity import event_hash
 from .models import Event
+
+_PYTEST_COUNT = re.compile(
+    r"(?P<count>\d+)\s+(?P<kind>passed|failed|error|errors|skipped|xfailed|xpassed)\b",
+    re.IGNORECASE,
+)
 
 
 class TraceRecorder:
@@ -25,7 +31,12 @@ class TraceRecorder:
 
     def emit(self, event_type: str, **data: Any) -> Event:
         timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        clean = Event(event_type=event_type, timestamp=timestamp, data=data, source=self.source)
+        clean = Event(
+            event_type=event_type,
+            timestamp=timestamp,
+            data=data,
+            source=self.source,
+        )
         digest = event_hash(clean, self._previous_hash)
         chained = Event(
             event_type=event_type,
@@ -41,7 +52,14 @@ class TraceRecorder:
     def record_model_call(self, provider: str, model: str, **metadata: Any) -> Event:
         return self.emit("model_call", provider=provider, model=model, **metadata)
 
-    def record_metric(self, name: str, value: float, *, independently_computed: bool = False, **metadata: Any) -> Event:
+    def record_metric(
+        self,
+        name: str,
+        value: float,
+        *,
+        independently_computed: bool = False,
+        **metadata: Any,
+    ) -> Event:
         return self.emit(
             "metric",
             name=name,
@@ -93,6 +111,12 @@ class TraceRecorder:
             duration_ms=duration_ms,
             timed_out=timed_out,
         )
+        summary = parse_pytest_summary(
+            "\n".join(part for part in (result.stdout, result.stderr) if part),
+            exit_code=result.returncode,
+        )
+        if summary is not None:
+            self.emit("test_summary", **summary)
         return result
 
     def _read_last_hash(self) -> str:
@@ -120,6 +144,32 @@ def record_command(trace: str | Path, argv: Sequence[str]) -> int:
 
         print(result.stderr, end="", file=sys.stderr)
     return int(result.returncode)
+
+
+def parse_pytest_summary(text: str, *, exit_code: int) -> dict[str, int] | None:
+    counts: dict[str, int] = {
+        "passed": 0,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+    }
+    found = False
+    for match in _PYTEST_COUNT.finditer(text):
+        found = True
+        kind = match.group("kind").lower()
+        if kind == "error":
+            kind = "errors"
+        counts[kind] += int(match.group("count"))
+    if not found:
+        return None
+    total = sum(counts.values())
+    return {
+        "total": total,
+        **counts,
+        "exit_code": int(exit_code),
+    }
 
 
 def _timeout_text(value: str | bytes | None) -> str:
