@@ -8,18 +8,29 @@ inputs:
     description: Path to the agent final response
     required: true
   fail-under:
-    description: Minimum evidence score
+    description: Minimum evidence score when no policy is supplied
     required: false
     default: "80"
+  policy:
+    description: Optional AgentProof acceptance policy JSON
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
     - shell: bash
       run: python -m pip install "${{ github.action_path }}"
-    - shell: bash
+    - if: ${{ inputs.policy == '' }}
+      shell: bash
       run: >-
         agentproof audit "${{ inputs.trace }}"
         --response-file "${{ inputs.response-file }}"
         --fail-under "${{ inputs.fail-under }}"
         --json agentproof-report.json
         --html agentproof-report.html
+    - if: ${{ inputs.policy != '' }}
+      shell: bash
+      run: >-
+        agentproof gate "${{ inputs.trace }}" "${{ inputs.policy }}"
+        --response-file "${{ inputs.response-file }}"
+        --json agentproof-gate-report.json

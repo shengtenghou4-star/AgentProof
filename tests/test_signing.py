@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from agentproof.bundle import build_evidence_bundle, verify_evidence_bundle
