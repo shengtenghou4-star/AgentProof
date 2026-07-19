@@ -11,7 +11,7 @@ def write_json(report: AuditReport, path: str | Path) -> None:
     Path(path).write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
 
 
-def write_html(report: AuditReport, path: str | Path) -> None:
+def render_html(report: AuditReport) -> str:
     rows = []
     for finding in report.findings:
         rows.append(
@@ -23,7 +23,7 @@ def write_html(report: AuditReport, path: str | Path) -> None:
             "</tr>"
         )
     integrity = "PASS" if report.integrity_ok else "FAIL"
-    document = f"""<!doctype html>
+    return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AgentProof audit {html.escape(report.run_id)}</title>
 <style>
@@ -38,4 +38,7 @@ small{{color:#667}} code{{background:#f3f5f7;padding:2px 5px;border-radius:4px}}
 <div><strong>{report.event_count}</strong><br><small>observed events</small></div></header>
 <table><thead><tr><th>ID</th><th>Claim</th><th>Status</th><th>Reason</th></tr></thead><tbody>{''.join(rows)}</tbody></table>
 </body></html>"""
-    Path(path).write_text(document, encoding="utf-8")
+
+
+def write_html(report: AuditReport, path: str | Path) -> None:
+    Path(path).write_text(render_html(report), encoding="utf-8")
