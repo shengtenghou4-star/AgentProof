@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="AgentProof interactive claim-to-evidence verification demo">
+  <title>AgentProof — Verify what agents actually did</title>
+  <style>
+    :root{color-scheme:dark;--bg:#07111f;--panel:#0d1b2d;--panel2:#12243a;--text:#eaf2ff;--muted:#9fb0c8;--line:#233a56;--cyan:#5ee7ff;--green:#6ff2ad;--yellow:#ffd36f;--red:#ff7d8b;--shadow:0 18px 60px rgba(0,0,0,.35)}
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 15% 0,#15345a 0,transparent 32%),radial-gradient(circle at 100% 20%,#15304a 0,transparent 26%),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+    a{color:var(--cyan)} .wrap{max-width:1180px;margin:auto;padding:30px 22px 70px}.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:64px}.brand{font-weight:800;letter-spacing:.04em}.badge{font-size:12px;border:1px solid var(--line);padding:7px 10px;border-radius:999px;color:var(--muted);background:rgba(13,27,45,.72)}
+    .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center}.eyebrow{color:var(--green);font-weight:700;text-transform:uppercase;letter-spacing:.16em;font-size:12px}.hero h1{font-size:clamp(44px,7vw,82px);line-height:.98;margin:15px 0 24px;letter-spacing:-.055em}.hero p{font-size:19px;line-height:1.65;color:var(--muted);max-width:690px}.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}.btn{display:inline-flex;text-decoration:none;color:var(--bg);font-weight:800;background:var(--cyan);padding:13px 18px;border-radius:12px}.btn.secondary{color:var(--text);background:transparent;border:1px solid var(--line)}
+    .terminal{background:#050b13;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}.terminal .bar{padding:12px 15px;background:#0a1422;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}.terminal pre{margin:0;padding:24px;font:14px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}.ok{color:var(--green)}.bad{color:var(--red)}.warn{color:var(--yellow)}.cyan{color:var(--cyan)}
+    .section{margin-top:92px}.section h2{font-size:36px;letter-spacing:-.03em;margin-bottom:10px}.section>p{color:var(--muted);line-height:1.65;max-width:760px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px}.card{background:linear-gradient(145deg,rgba(18,36,58,.92),rgba(10,23,39,.92));border:1px solid var(--line);border-radius:17px;padding:22px;box-shadow:0 10px 35px rgba(0,0,0,.16)}.card h3{margin:0 0 10px}.card p{margin:0;color:var(--muted);line-height:1.55;font-size:14px}.metric{font-size:34px;font-weight:850;letter-spacing:-.04em;margin:12px 0 5px}.metric small{font-size:14px;color:var(--muted);font-weight:600}
+    .demo{display:grid;grid-template-columns:320px 1fr;gap:16px;margin-top:28px}.scenarios{display:flex;flex-direction:column;gap:10px}.scenario{appearance:none;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:13px;padding:15px;cursor:pointer;font-weight:700}.scenario span{display:block;color:var(--muted);font-size:12px;font-weight:500;margin-top:5px}.scenario.active{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset;background:#102940}.evidence{background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:24px}.claim{font:15px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:#07101b;border:1px solid var(--line);padding:14px;border-radius:12px}.verdict{display:flex;align-items:center;justify-content:space-between;margin:20px 0 12px;padding-bottom:16px;border-bottom:1px solid var(--line)}.status{font-weight:850;text-transform:uppercase;letter-spacing:.1em}.facts{display:grid;gap:10px}.fact{display:flex;justify-content:space-between;gap:18px;padding:11px 0;border-bottom:1px dashed rgba(159,176,200,.2);color:var(--muted)}.fact strong{color:var(--text);text-align:right}.scope{margin-top:32px;padding:18px;border-left:3px solid var(--yellow);background:rgba(255,211,111,.07);color:var(--muted);line-height:1.55}.footer{margin-top:92px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:24px}
+    @media(max-width:850px){.hero,.demo{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.nav{margin-bottom:38px}.terminal{order:2}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav"><div class="brand">AGENTPROOF</div><div class="badge">Evidence, not completion language</div></nav>
+  <main>
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Open-source agent verification</div>
+        <h1>Trust the evidence.<br>Not the agent.</h1>
+        <p>AgentProof maps an AI agent’s claims to tests, independently recomputed metrics, attested model routes, artifact hashes, health checks, and reproducible reruns. Unsupported work fails closed.</p>
+        <div class="cta"><a class="btn" href="https://github.com/shengtenghou4-star/8">Inspect the repository</a><a class="btn secondary" href="#demo">Try the audit demo</a></div>
+      </div>
+      <div class="terminal" aria-label="AgentProof command example">
+        <div class="bar">agentproof project-audit profile.json --fail-under 100</div>
+        <pre><span class="cyan">claim</span>  All tests passed.
+<span class="cyan">trace</span>  58 passed · exit code 0
+<span class="cyan">chain</span>  SHA-256 integrity valid
+<span class="cyan">route</span>  requested premium-model
+       returned economy-model
+
+<span class="ok">VERIFIED</span>     test completion
+<span class="bad">CONTRADICTED</span> model identity
+<span class="warn">BLOCKED</span>      release policy</pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>A complete verification chain</h2>
+      <p>The project stays deterministic where possible. It records observable facts, verifies atomic claims, reruns declared checks, and emits machine-readable evidence for CI and human review.</p>
+      <div class="grid">
+        <article class="card"><h3>Claim → evidence</h3><p>Completion language is split into independently testable statements and matched to concrete runtime events.</p></article>
+        <article class="card"><h3>Route attestation</h3><p>An OpenAI-compatible proxy records requested and returned model identities without retaining prompt or response text.</p></article>
+        <article class="card"><h3>Project audits</h3><p>Profiles execute tests, lint, builds, and artifact checks; outputs receive hashes, provenance, SARIF, JUnit, JSON, and HTML reports.</p></article>
+        <article class="card"><h3>Reproducible replay</h3><p>Checks can rerun in a clean workspace or resource-limited Docker environment with network disabled by default.</p></article>
+        <article class="card"><h3>Gaming detection</h3><p>Detectors cover hidden failures, evaluator tampering, stale artifacts, mock deployments, route substitution, cherry-picking, and leakage.</p></article>
+        <article class="card"><h3>Privacy-preserving traces</h3><p>Secrets are redacted, long output is bounded, and transcript content can be represented by cryptographic digests.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="demo">
+      <h2>Interactive audit</h2>
+      <p>Select a scenario. The same claim receives a different verdict depending on the evidence.</p>
+      <div class="demo">
+        <div class="scenarios" id="scenarios"></div>
+        <div class="evidence">
+          <div class="claim" id="claim"></div>
+          <div class="verdict"><span>AgentProof verdict</span><span class="status" id="status"></span></div>
+          <div class="facts" id="facts"></div>
+          <div class="scope" id="reason"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Evidence boundaries are part of the product</h2>
+      <div class="grid">
+        <article class="card"><div class="metric">0 <small>runtime dependencies</small></div><p>The core package uses the Python standard library. Optional development tools power tests and packaging.</p></article>
+        <article class="card"><div class="metric">4 <small>verdict levels</small></div><p>Verified, partial, unsupported, and contradicted preserve uncertainty instead of flattening it.</p></article>
+        <article class="card"><div class="metric">Fail closed <small>by default</small></div><p>Missing evidence, invalid hashes, unexpected exit codes, and mismatched artifacts block strict project profiles.</p></article>
+      </div>
+      <div class="scope"><strong>Scope:</strong> AgentProof is application-layer verification infrastructure, not hardware remote attestation, a formal proof system, or a guarantee against every privileged attacker. Benchmark results describe controlled suites and must not be presented as universal real-world detection rates.</div>
+    </section>
+  </main>
+  <footer class="footer">Apache-2.0 · Reproducible evidence · Explicit limitations · <a href="https://github.com/shengtenghou4-star/8">github.com/shengtenghou4-star/8</a></footer>
+</div>
+<script>
+const data=[
+ {name:'Honest test run',hint:'Concrete test summary',claim:'All tests passed.',status:'verified',facts:[['Tests','58 total'],['Failed','0'],['Errors','0'],['Exit code','0'],['Hash chain','valid']],reason:'The latest non-zero test run reports no failures or errors and exits successfully.'},
+ {name:'Hidden failure',hint:'Summary contradicts claim',claim:'All tests passed.',status:'contradicted',facts:[['Tests','58 total'],['Failed','2'],['Errors','0'],['Exit code','1'],['Hidden from final answer','yes']],reason:'Recorded execution directly contradicts the completion claim. The release is blocked.'},
+ {name:'Model substitution',hint:'Network-boundary evidence',claim:'I used gateway/premium-model.',status:'contradicted',facts:[['Requested model','premium-model'],['Returned model','economy-model'],['HTTP status','200'],['Route evidence','attested'],['Prompt stored','no']],reason:'The proxy observed a successful call, but the upstream response identified a different model.'},
+ {name:'Unproven metric',hint:'Self-reported only',claim:'AUC reached 0.757.',status:'partial',facts:[['Reported AUC','0.757'],['Independent recomputation','missing'],['Prediction artifact','present'],['Labels artifact','missing']],reason:'The number matches a recorded metric, but the evidence cannot independently reproduce it.'},
+ {name:'Missing artifact',hint:'File does not exist',claim:'Created report.json.',status:'contradicted',facts:[['Path','report.json'],['Exists','false'],['SHA-256','none'],['Manifest entry','present']],reason:'The artifact event explicitly reports that the claimed file does not exist.'}
+];
+const scenarios=document.getElementById('scenarios'),claim=document.getElementById('claim'),status=document.getElementById('status'),facts=document.getElementById('facts'),reason=document.getElementById('reason');
+function render(i){document.querySelectorAll('.scenario').forEach((b,n)=>b.classList.toggle('active',n===i));const d=data[i];claim.textContent=d.claim;status.textContent=d.status;status.className='status '+({verified:'ok',contradicted:'bad',partial:'warn',unsupported:'warn'}[d.status]||'');facts.innerHTML=d.facts.map(([k,v])=>`<div class="fact"><span>${k}</span><strong>${v}</strong></div>`).join('');reason.textContent=d.reason}
+data.forEach((d,i)=>{const b=document.createElement('button');b.className='scenario';b.innerHTML=`${d.name}<span>${d.hint}</span>`;b.onclick=()=>render(i);scenarios.appendChild(b)});render(0);
+</script>
+</body>
+</html>
