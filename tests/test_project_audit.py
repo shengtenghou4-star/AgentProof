@@ -44,7 +44,8 @@ def test_project_audit_runs_checks_and_verifies_artifacts(tmp_path):
     assert result.checks[0]["passed"] is True
     assert result.artifacts[0]["exists"] is True
     statuses = {
-        finding["kind"]: finding["status"] for finding in result.audit["findings"]
+        finding["claim"]["kind"]: finding["status"]
+        for finding in result.audit["findings"]
     }
     assert statuses["file_created"] == "verified"
     assert (tmp_path / "audit" / "project-audit.json").is_file()
