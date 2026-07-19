@@ -53,6 +53,7 @@ _NEGATION = re.compile(
 )
 _ALLOWED_STRUCTURED_KINDS = {
     "all_tests_passed",
+    "check_succeeded",
     "completed",
     "deployed",
     "file_created",
