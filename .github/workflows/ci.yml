@@ -1,4 +1,5 @@
 name: ci
+
 on:
   push:
   pull_request:
@@ -30,6 +31,46 @@ jobs:
           path: pytest-report.xml
           if-no-files-found: ignore
 
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]'
+      - run: coverage run -m pytest
+      - run: coverage report
+      - run: coverage xml -o coverage.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: error
+
+  package-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install build
+      - run: python -m build
+      - run: python -m venv /tmp/agentproof-wheel
+      - run: /tmp/agentproof-wheel/bin/pip install dist/*.whl
+      - run: /tmp/agentproof-wheel/bin/agentproof --help
+      - run: /tmp/agentproof-wheel/bin/agentproof benchmark --suite core
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/*
+          if-no-files-found: error
+
   self-audit:
     runs-on: ubuntu-latest
     steps:
@@ -47,8 +88,8 @@ jobs:
             --output-dir self-audit \
             --fail-under 100 \
             --json self-audit-summary.json
-      - name: Run 300-case perturbed benchmark
-        run: agentproof benchmark --suite extended --json benchmark-report.json
+      - name: Run all deterministic benchmark suites
+        run: agentproof benchmark --suite all --json benchmark-report.json
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -57,4 +98,38 @@ jobs:
             self-audit/**
             self-audit-summary.json
             benchmark-report.json
+          if-no-files-found: error
+
+  claimforge-case-study:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout AgentProof
+        uses: actions/checkout@v4
+        with:
+          path: agentproof
+      - name: Checkout ClaimForge
+        uses: actions/checkout@v4
+        with:
+          repository: shengtenghou4-star/7
+          path: claimforge
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e './agentproof[dev]' -e './claimforge[dev]'
+      - name: Audit ClaimForge as a real project
+        run: |
+          agentproof project-audit agentproof/case-studies/claimforge/profile.json \
+            --source claimforge \
+            --output-dir claimforge-audit \
+            --fail-under 100 \
+            --json claimforge-audit-summary.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claimforge-agentproof-case-study
+          path: |
+            claimforge-audit/**
+            claimforge-audit-summary.json
           if-no-files-found: error
