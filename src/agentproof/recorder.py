@@ -11,6 +11,7 @@ from typing import Any, Sequence
 
 from .integrity import event_hash
 from .models import Event
+from .security import capture_text
 
 _PYTEST_COUNT = re.compile(
     r"(?P<count>\d+)\s+(?P<kind>passed|failed|error|errors|skipped|xfailed|xpassed)\b",
@@ -21,9 +22,16 @@ _PYTEST_COUNT = re.compile(
 class TraceRecorder:
     """Append-only JSONL recorder with an embedded SHA-256 hash chain."""
 
-    def __init__(self, path: str | Path, *, source: str = "recorder") -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        source: str = "recorder",
+        max_output_bytes: int = 65536,
+    ) -> None:
         self.path = Path(path)
         self.source = source
+        self.max_output_bytes = max_output_bytes
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._previous_hash = ""
         if self.path.exists() and self.path.stat().st_size:
@@ -101,13 +109,22 @@ class TraceRecorder:
             )
             timed_out = True
         duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+        stdout_capture = capture_text(result.stdout, max_bytes=self.max_output_bytes)
+        stderr_capture = capture_text(result.stderr, max_bytes=self.max_output_bytes)
         self.emit(
             "command",
             command=list(command),
             cwd=str(cwd) if cwd else None,
             exit_code=result.returncode,
-            stdout=result.stdout,
-            stderr=result.stderr,
+            stdout=stdout_capture.text,
+            stderr=stderr_capture.text,
+            stdout_sha256=stdout_capture.sha256,
+            stderr_sha256=stderr_capture.sha256,
+            stdout_original_bytes=stdout_capture.original_bytes,
+            stderr_original_bytes=stderr_capture.original_bytes,
+            stdout_truncated=stdout_capture.truncated,
+            stderr_truncated=stderr_capture.truncated,
+            redactions=stdout_capture.redactions + stderr_capture.redactions,
             duration_ms=duration_ms,
             timed_out=timed_out,
         )

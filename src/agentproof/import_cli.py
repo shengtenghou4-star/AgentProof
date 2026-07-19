@@ -5,7 +5,13 @@ import json
 import sys
 from pathlib import Path
 
-from .adapters import convert_claude_code, convert_openai_responses, convert_otlp_json
+from .adapters import (
+    convert_agent_traces,
+    convert_claude_code,
+    convert_codex,
+    convert_openai_responses,
+    convert_otlp_json,
+)
 from .io import dump_events
 
 
@@ -16,7 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "format",
-        choices=("claude-code", "openai-responses", "otel"),
+        choices=("agent-traces", "claude-code", "codex", "openai-responses", "otel"),
     )
     parser.add_argument("input", type=Path)
     parser.add_argument("output", type=Path)
@@ -29,6 +35,10 @@ def main(argv: list[str] | None = None) -> int:
         raw = args.input.read_text(encoding="utf-8")
         if args.format == "claude-code":
             events = convert_claude_code(raw)
+        elif args.format == "codex":
+            events = convert_codex(raw)
+        elif args.format == "agent-traces":
+            events = convert_agent_traces(raw)
         elif args.format == "openai-responses":
             events = convert_openai_responses(raw)
         else:

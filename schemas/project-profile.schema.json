@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentproof.dev/schemas/project-profile.schema.json",
+  "title": "AgentProof Project Audit Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "name": {"type": "string", "minLength": 1},
+    "allow_partial": {"type": "boolean", "default": true},
+    "distributions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "environment_names": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "command": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "claim": {"type": "string", "minLength": 1},
+          "cwd": {"type": "string", "default": "."},
+          "timeout_seconds": {"type": "integer", "minimum": 1, "default": 300},
+          "expected_exit_code": {"type": "integer", "default": 0}
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "claim": {"type": "string", "minLength": 1},
+          "expected_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          }
+        }
+      }
+    }
+  },
+  "anyOf": [
+    {"required": ["checks"], "properties": {"checks": {"minItems": 1}}},
+    {"required": ["artifacts"], "properties": {"artifacts": {"minItems": 1}}}
+  ]
+}

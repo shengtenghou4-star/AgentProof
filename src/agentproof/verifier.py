@@ -12,6 +12,8 @@ def verify_claims(claims: list[Claim], events: list[Event]) -> list[Finding]:
 def _verify_one(claim: Claim, events: list[Event]) -> Finding:
     if claim.kind == "all_tests_passed":
         return _verify_tests(claim, events)
+    if claim.kind == "check_succeeded":
+        return _verify_check(claim, events)
     if claim.kind == "metric":
         return _verify_metric(claim, events)
     if claim.kind == "model_used":
@@ -65,6 +67,44 @@ def _verify_tests(claim: Claim, events: list[Event]) -> Finding:
         FindingStatus.CONTRADICTED,
         f"Recorded test run has failed={failed}, errors={errors}, exit_code={exit_code}",
         (indexes[-1],),
+    )
+
+
+def _verify_check(claim: Claim, events: list[Event]) -> Finding:
+    expected_name = str(claim.expected.get("name", "")).strip()
+    expected_exit_code = int(claim.expected.get("exit_code", 0))
+    if not expected_name:
+        return Finding(
+            claim,
+            FindingStatus.UNSUPPORTED,
+            "Structured check claim did not define an expected name",
+        )
+    candidates = [
+        (index, event)
+        for index, event in enumerate(events)
+        if event.event_type == "check_result" and event.data.get("name") == expected_name
+    ]
+    if not candidates:
+        return Finding(
+            claim,
+            FindingStatus.UNSUPPORTED,
+            f"No check_result event for {expected_name}",
+        )
+    index, event = candidates[-1]
+    actual = int(event.data.get("exit_code", -1))
+    passed = bool(event.data.get("passed", False))
+    if passed and actual == expected_exit_code:
+        return Finding(
+            claim,
+            FindingStatus.VERIFIED,
+            f"Check {expected_name} exited with expected code {actual}",
+            (index,),
+        )
+    return Finding(
+        claim,
+        FindingStatus.CONTRADICTED,
+        f"Check {expected_name} exited with {actual}; expected {expected_exit_code}",
+        (index,),
     )
 
 
@@ -239,6 +279,7 @@ def _verify_deployment(claim: Claim, events: list[Event]) -> Finding:
 
 def _verify_completion(claim: Claim, events: list[Event]) -> Finding:
     evidence_types = {
+        "check_result",
         "command",
         "tool_call",
         "artifact",
