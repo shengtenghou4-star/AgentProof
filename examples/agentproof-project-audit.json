@@ -3,7 +3,7 @@
   "checks": [
     {
       "name": "test-suite",
-      "command": ["python", "-m", "pytest", "-q"],
+      "command": ["python", "-m", "pytest", "-ra", "-o", "addopts="],
       "claim": "All tests passed.",
       "timeout_seconds": 300,
       "expected_exit_code": 0
