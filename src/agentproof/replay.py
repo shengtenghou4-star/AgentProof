@@ -91,7 +91,7 @@ def replay(
     copied_root = workspace_path / "workspace"
     copy_source(source.resolve(), copied_root)
 
-    environment = clean_environment() if clean_environment else dict(os.environ)
+    environment = _clean_environment() if clean_environment else dict(os.environ)
     results: list[ReplayStepResult] = []
     try:
         for step in steps:
@@ -167,7 +167,7 @@ def resolve_step_cwd(root: Path, step: ReplayStep) -> Path:
     return cwd
 
 
-def clean_environment() -> dict[str, str]:
+def _clean_environment() -> dict[str, str]:
     allowed = {
         "PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC", "TMP", "TEMP", "HOME", "USERPROFILE",
         "LANG", "LC_ALL", "PYTHONUTF8", "PYTHONIOENCODING",
