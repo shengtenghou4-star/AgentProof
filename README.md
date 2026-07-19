@@ -1,54 +1,83 @@
 # AgentProof
 
+[![CI](https://github.com/shengtenghou4-star/8/actions/workflows/ci.yml/badge.svg)](https://github.com/shengtenghou4-star/8/actions/workflows/ci.yml)
+[![Live Demo](https://img.shields.io/badge/live-demo-5ee7ff)](https://shengtenghou4-star.github.io/8/)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
+![Version](https://img.shields.io/badge/version-0.5.0-orange)
+![License](https://img.shields.io/badge/license-Apache--2.0-green)
+
 **Evidence-based verification for autonomous AI agents.**
 
-AgentProof checks whether an agent's final claims are supported by observable execution evidence. It maps completion language to tests, independently recomputed metrics, attested model routes, artifact hashes, health checks, acceptance policies, and reproducible reruns.
+AgentProof checks whether an agent's final claims are supported by observable execution evidence. It maps completion language to tests, independently recomputed metrics, attested model routes, artifact hashes, health checks, acceptance policies, reproducible reruns, and exact project-level acceptance checks.
 
-The project starts from a simple rule: **do not trust completion language; verify external facts.**
+> **Do not trust completion language. Verify external facts.**
 
-## Capabilities
+**[Open the interactive demo →](https://shengtenghou4-star.github.io/8/)** · **[Inspect the evidence claims matrix →](docs/EVIDENCE_CLAIMS.md)** · **[Read the coding-stage completion boundary →](docs/INTERNAL_COMPLETION.md)**
 
-- atomic claim extraction and deterministic verification;
-- test, metric, model-route, artifact, deployment, and completion checks;
-- an OpenAI-compatible route-attestation proxy that records requested and returned models without storing prompts, responses, or authorization values;
-- native privacy-preserving importers for Claude Code JSON/stream-json and OpenAI Responses objects/event streams;
-- run-level detectors for grader tampering, hidden failures, stale artifacts, mock deployment evidence, unauthorized acceptance changes, model substitution, seed cherry-picking, and data leakage;
-- profile-driven end-to-end project audits that execute acceptance checks, hash artifacts and produce a portable evidence report;
-- explicit acceptance policies that fail CI when required evidence is missing;
-- append-only hash-chained traces and artifact integrity manifests;
-- signed portable evidence bundles;
-- local clean-workspace replay and resource-limited Docker replay;
-- AgentProofBench core and 300+ case perturbation suites with false-accept rate, Wilson intervals, confusion matrices, and per-category results;
-- cross-run reliability aggregation;
-- OTLP/JSON import for model and tool spans;
-- dependency-free local REST API and interactive dashboard;
-- reusable GitHub Action, JSON/HTML reports, schemas, and CI thresholds;
-- zero mandatory runtime dependencies.
+## Validated evidence at a glance
 
-## Quick start
+The v0.5.0 internal validation lane currently demonstrates:
+
+| Evidence | Result |
+|---|---:|
+| AgentProof test suite | 76 passed on Python 3.10, 3.11 and 3.12 |
+| Strict self-audit | 100/100; 5/5 claims verified; hash chain valid |
+| Core controlled benchmark | 38/38 correct; 0/25 unsafe false accepts |
+| Language/format perturbation suite | 304/304 correct; 0/200 unsafe false accepts |
+| Layout/context holdout-style suite | 1,216/1,216 correct; 0/800 unsafe false accepts |
+| Combined deterministic corpus | 1,558 cases; 1,025 unsafe; zero false accepts |
+| Deterministic parser fuzzing | 5,000 generated cases with a fixed seed |
+| Source coverage | 78.2% line coverage; 64.2% branch coverage |
+| Package validation | wheel + sdist build; clean-venv wheel install and CLI smoke pass |
+| ClaimForge cross-project audit | 54 tests, lint and public-claim validation pass; audit 100/100 |
+
+These are **controlled, repository-owned validation results**. They are strong regression and engineering evidence, not a claim of universal real-world deception-detection accuracy, independent assurance, or production impact.
+
+## Complete verification stack
+
+- **Atomic claims** — conservative natural-language extraction plus explicit `AGENTPROOF_CLAIM` JSON records.
+- **Negation safety** — statements such as “not all tests passed” are not converted into positive claims.
+- **Four verdicts** — `verified`, `partial`, `unsupported`, and `contradicted` preserve evidence quality instead of flattening it.
+- **Claim verifiers** — tests, named checks, metrics, models, artifacts, deployments and overall completion.
+- **Model-route attestation** — an OpenAI-compatible proxy observes requested and returned model identities, status, request IDs, latency and body digests without retaining prompt or response text.
+- **Evaluation-gaming detectors** — protected evaluator changes, hidden failures, stale artifacts, mock health checks, acceptance rewriting, route substitution, seed cherry-picking and future/label leakage.
+- **Project audits** — execute declared tests, lint, builds and validation commands; enforce expected exit codes and artifact digests; produce a single strict pass/fail result.
+- **Evidence integrity** — append-only SHA-256 event chains, artifact manifests and signed portable bundles.
+- **Privacy controls** — common secret redaction, bounded output capture, full-output digests and hashed transcript content.
+- **Runtime provenance** — Python, platform, dependency, Git and selected environment fingerprints.
+- **Reproducible replay** — clean local workspaces and network-denied, resource-limited Docker reruns.
+- **Runtime adapters** — Claude Code, Codex, OpenAI Responses, generic OpenAI Agents/LangGraph-style traces and OTLP/JSON.
+- **Delivery** — CLI, Python API, local REST API/dashboard, GitHub Action, interactive static demo, JSON, HTML, SARIF and JUnit.
+- **Zero mandatory runtime dependencies** — the core package uses the Python standard library.
+
+## Five-minute proof
 
 ```bash
-python -m pip install -e '.[dev]'
-agentproof audit examples/sample_trace.jsonl --response-file examples/sample_response.txt --json agentproof-report.json --html agentproof-report.html
-agentproof gate examples/sample_trace.jsonl examples/strict-policy.json --response-file examples/sample_response.txt --json gate-report.json
-agentproof record-command run.jsonl pytest -q
-agentproof project-audit examples/agentproof-project-audit.json --source . --output-dir project-audit --fail-under 100
-agentproof manifest artifacts.json model.pkl report.json --root .
-agentproof verify-manifest artifacts.json --root .
-agentproof-import claude-code claude-run.jsonl claude-evidence.jsonl
-agentproof-import openai-responses responses.jsonl openai-evidence.jsonl
-agentproof-import otel otlp.json otel-evidence.jsonl
-agentproof replay examples/replay.json --source . --json replay-report.json
-agentproof replay examples/replay.json --source . --docker-image python:3.12-slim --json container-report.json
-agentproof bundle evidence.json --trace run.jsonl --response-file final-response.txt --artifact model.pkl --root . --key-file .agentproof-key
-agentproof verify-bundle evidence.json --root . --key-file .agentproof-key
-agentproof summarize run-1.json run-2.json --json reliability.json
-agentproof benchmark --suite core
-agentproof benchmark --suite extended --json benchmark-report.json
-agentproof serve --host 127.0.0.1 --port 8080
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+pip install -e '.[dev]'
+
+# Audit an existing trace and final response.
+agentproof audit examples/sample_trace.jsonl \
+  --response-file examples/sample_response.txt \
+  --json audit.json \
+  --html audit.html \
+  --sarif audit.sarif \
+  --junit audit.xml
+
+# Discover this repository's checks, then audit the whole project.
+agentproof init-profile agentproof-profile.json --source .
+agentproof project-audit agentproof-profile.json \
+  --source . \
+  --output-dir project-audit \
+  --fail-under 100
+
+# Run every deterministic benchmark suite.
+agentproof benchmark --suite all --json benchmark-report.json
 ```
 
-To attest the actual upstream model route:
+## Model-route attestation
 
 ```bash
 agentproof-proxy \
@@ -58,72 +87,120 @@ agentproof-proxy \
   --port 8787
 ```
 
-Point the agent's OpenAI-compatible base URL at `http://127.0.0.1:8787`. The proxy forwards authorization but records only header names and body hashes, not secret values or prompt/response text.
+Point the agent's OpenAI-compatible base URL at `http://127.0.0.1:8787`. The proxy forwards authorization but records only header names, route facts and cryptographic body digests. It identifies requested/returned substitutions and failed calls. It cannot observe traffic that bypasses the proxy, so production use should pair it with network egress controls.
 
-## Evidence gates and adversarial detection
+## Runtime imports
 
-Policies convert evidence quality into enforceable release criteria: minimum score, valid hash chain, zero contradictions, verified claim types, and concrete runtime events with equality or numeric conditions.
+```bash
+agentproof-import claude-code claude-run.jsonl claude-evidence.jsonl
+agentproof-import codex codex-run.jsonl codex-evidence.jsonl
+agentproof-import openai-responses responses.jsonl openai-evidence.jsonl
+agentproof-import agent-traces agent-events.jsonl agent-evidence.jsonl
+agentproof-import otel otlp.json otel-evidence.jsonl
+```
 
-AgentProof also scans execution records for observable gaming signals rather than waiting for the final answer to disclose them. The detectors cover protected evaluator-file modifications, suppressed command failures, stale artifact reuse, mock health checks, unauthorized acceptance changes, requested/actual model substitution, best-seed-only reporting, and future-data leakage.
+Prompt, response, tool-argument and tool-result content is represented by SHA-256 where the source format permits. Stable semantic fields—provider, model, run ID, call ID, status and explicit errors—remain available for verification.
 
-The extended benchmark deterministically expands every seed oracle across eight wording and formatting perturbations. It exercises paraphrases, Markdown, prefixes, suffixes and line breaks while retaining the same evidence ground truth.
+## Project audit bundle
 
-## Replay, provenance, and integration
+A profile defines commands, expected exit codes, optional explicit claims, required artifacts, optional expected artifact digests, dependency names and selected environment variable names.
 
-Local replay copies source into a fresh temporary workspace, strips common local-state directories, reduces inherited environment variables, executes argv commands without a shell, and emits a reproducibility report.
+```json
+{
+  "$schema": "schemas/project-profile.schema.json",
+  "name": "example-project",
+  "allow_partial": false,
+  "checks": [
+    {
+      "name": "tests",
+      "command": ["python", "-m", "pytest", "-ra"],
+      "expected_exit_code": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "dist/report.json",
+      "expected_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  ]
+}
+```
 
-Docker replay adds network denial, capability dropping, `no-new-privileges`, memory/CPU/process limits, and disposable mounts. Evidence bundles pin responses, traces, and artifacts by SHA-256 and can be signed with HMAC-SHA256.
+The output directory contains:
 
-The route proxy provides application-layer model provenance by observing the request model, provider request ID, returned model, status, latency, and cryptographic body digests. It marks substitutions and failed calls as contradictions.
-
-Native transcript adapters normalize Claude Code and OpenAI Responses records into model, tool, and result evidence. Prompt, response, tool argument, and tool result content is stored as SHA-256 rather than plaintext.
-
-Project-audit profiles declare executable checks, expected exit codes, audit claims and required artifacts. AgentProof produces a hash-chained trace, claim verdicts, JSON/HTML reports and a single machine-readable project result.
-
-The local server exposes `/api/audit`, `/api/gate`, `/health`, and an interactive dashboard at `/`. It accepts inline evidence only and does not execute uploaded commands.
+- `evidence.jsonl` — hash-chained command, check, artifact and provenance evidence;
+- `provenance.json` — runtime/dependency/Git/environment fingerprint;
+- `final-response.txt` — exact claims under audit;
+- `audit-report.json` and `audit-report.html`;
+- `audit-report.sarif` and `audit-report.xml`;
+- `project-audit.json` — complete project result.
 
 ## Architecture
 
 ```text
-Agent final response ──> claim extraction ───────> atomic claims
-Runtime exports ────────> native adapters ───────> normalized evidence
-Runtime trace ─────────> event normalization ────> observed facts
+Agent final response ──> claim extraction ───────> atomic or structured claims
+Runtime exports ───────> privacy-safe adapters ─> normalized evidence
+Commands ──────────────> bounded recorder ───────> output digests + test summaries
 API traffic ───────────> route attestation ──────> provider/model evidence
-Project profile ───────> check orchestration ────> end-to-end audit bundle
+Project profile ───────> check orchestration ────> strict audit bundle
 Runtime trace ─────────> anomaly detectors ──────> gaming findings
 Acceptance policy ─────> evidence gate ──────────> pass / fail
-Replay manifest ───────> local/container rerun ──> reproducibility evidence
+Replay manifest ───────> local/container rerun ─> reproducibility evidence
 Artifacts + trace ─────> signed bundle ──────────> provenance evidence
-Audit reports ─────────> reliability aggregation > cross-run comparison
-API/dashboard ─────────> integration surface ────> human and machine use
+Audit reports ─────────> JSON/HTML/SARIF/JUnit ─> human and machine review
 ```
+
+## Internal validation versus external validation
+
+The coding-stage definition of done includes implementation, tests, fuzzing, controlled benchmarks, package validation, self-audit, ClaimForge cross-project audit, documentation and the public demo. See [`docs/INTERNAL_COMPLETION.md`](docs/INTERNAL_COMPLETION.md).
+
+The following are deliberately deferred because more code cannot manufacture them:
+
+- independent penetration testing or security assessment;
+- independently designed and labeled holdout attacks;
+- unrelated external users, adoption, citations or institutional endorsement;
+- production deployment and verified operational impact;
+- private enterprise traces or confidential incident data.
 
 ## Documentation
 
-- `docs/project-audit.md`
-- `docs/model-route-attestation.md`
-- `docs/native-adapters.md`
-- `docs/threat-model.md`
-- `docs/container-replay.md`
-- `docs/benchmark.md`
-- `docs/reliability-reports.md`
-- `docs/api.md`
-
-## Roadmap
-
-1. Codex and additional coding-agent transcript adapters.
-2. Real multi-step agent-run corpora and independently labeled traces.
-3. ClaimForge and Major Forest case studies.
-4. Public alpha packaging and hosted demo.
+- [Internal completion boundary](docs/INTERNAL_COMPLETION.md)
+- [Evidence claims matrix](docs/EVIDENCE_CLAIMS.md)
+- [Technical report](docs/TECHNICAL_REPORT.md)
+- [Project audits](docs/project-audit.md)
+- [Benchmarks](docs/benchmark.md)
+- [Model-route attestation](docs/model-route-attestation.md)
+- [Native adapters](docs/native-adapters.md)
+- [Threat model](docs/threat-model.md)
+- [Container replay](docs/container-replay.md)
+- [Reliability reports](docs/reliability-reports.md)
+- [Local API](docs/api.md)
+- [Security policy](SECURITY.md)
+- [Contribution standard](CONTRIBUTING.md)
 
 ## Development
 
 ```bash
 python -m pip install -e '.[dev]'
-ruff check src tests
+ruff check src tests scripts
 pytest
+coverage run -m pytest
+coverage report
+python scripts/fuzz_claims.py
+python -m build
 ```
 
-## Status
+## Honest limitations
 
-AgentProof is an early alpha. It is usable for deterministic evidence audits, model-route attestation, transcript normalization, project-level acceptance audits, provenance verification, reproducibility checks, and local API integrations. It is not a formal security boundary.
+- Controlled benchmarks are not independently sampled real-world accuracy estimates.
+- Application-layer model-route evidence is not hardware-backed attestation.
+- Hash chains and signatures depend on the integrity of their verifier, keys and trust roots.
+- Docker replay reduces ambient privilege but is not a safe host for arbitrary hostile native code.
+- Redaction covers common credential forms, not every possible secret representation.
+- Project audits verify declared acceptance criteria; undeclared business correctness remains outside the profile.
+- Runtime adapters are tested against supported record shapes and may require updates as vendor formats evolve.
+- The ClaimForge case study is an internally operated, cross-repository reproducibility test—not third-party assurance.
+
+## License and citation
+
+Apache-2.0. Citation metadata is available in [`CITATION.cff`](CITATION.cff).
