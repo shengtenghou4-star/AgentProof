@@ -6,25 +6,18 @@ AgentProof checks whether an agent's final claims are supported by observable ex
 
 The project starts from a simple rule: **do not trust completion language; verify external facts.**
 
-## Why this exists
+## Capabilities
 
-Agent traces show what was logged. They do not automatically prove that an agent's summary is accurate, complete, reproducible, or free from grader gaming. AgentProof adds a deterministic verification layer between agent execution and human acceptance.
-
-Current alpha capabilities:
-
-- conservative extraction of atomic, testable claims;
-- verification of test, metric, model-routing, artifact, deployment, and completion claims;
-- contradiction detection for false “all passed” and deployment claims;
-- independent-metric evidence distinction;
-- append-only tamper-evident trace recorder;
+- atomic claim extraction and deterministic verification;
+- test, metric, model-route, artifact, deployment, and completion checks;
+- contradiction detection for inflated completion language;
+- append-only hash-chained traces;
 - artifact integrity manifests;
+- signed portable evidence bundles;
 - clean copied-workspace replay with reduced environment and no shell execution;
-- built-in adversarial false-completion benchmark;
-- reusable composite GitHub Action;
+- adversarial false-completion benchmark;
 - OTLP/JSON import for model and tool spans;
-- published JSON Schemas for evidence events and replay manifests;
-- JSON and standalone HTML audit reports;
-- CI threshold support through `--fail-under`;
+- reusable GitHub Action, JSON/HTML reports, schemas, and CI thresholds;
 - zero runtime dependencies.
 
 ## Quick start
@@ -41,20 +34,24 @@ agentproof manifest artifacts.json model.pkl report.json --root .
 agentproof verify-manifest artifacts.json --root .
 agentproof import-otel otlp.json run.jsonl
 agentproof replay examples/replay.json --source . --json replay-report.json
+
+# use a random 32+ byte secret kept outside version control
+agentproof bundle evidence.json \
+  --trace run.jsonl \
+  --response-file final-response.txt \
+  --artifact model.pkl \
+  --artifact report.json \
+  --root . \
+  --key-file .agentproof-key
+agentproof verify-bundle evidence.json --root . --key-file .agentproof-key
 agentproof benchmark
 ```
 
 The included sample deliberately contains inflated claims: four tests failed and the deployment health check returned 503. AgentProof marks those claims as contradicted while independently verifying the recorded AUC and model route.
 
-## Event format
+## Evidence model
 
-AgentProof consumes newline-delimited JSON. Every row contains an observed event:
-
-```json
-{"event_type":"test_summary","timestamp":"2026-07-19T09:01:08Z","data":{"total":100,"passed":96,"failed":4,"errors":0,"exit_code":1}}
-```
-
-Supported alpha event types:
+AgentProof consumes newline-delimited JSON events and maps each extracted claim to observable evidence.
 
 | Event | Key fields | Claim verified |
 |---|---|---|
@@ -65,11 +62,13 @@ Supported alpha event types:
 | `healthcheck` | `url`, `status_code` | deployment status |
 | `command`, `tool_call` | execution metadata | completion support |
 
-## Replay
+## Replay and bundles
 
-A replay manifest declares deterministic acceptance checks as argv arrays. AgentProof copies the source into a fresh temporary workspace, removes common local-state directories, reduces inherited environment variables, executes without a shell, stops at the first failed step, and returns a machine-readable reproducibility report.
+Replay manifests declare deterministic checks as argv arrays. AgentProof copies the source into a fresh temporary workspace, strips common local-state directories, reduces inherited environment variables, executes without a shell, and emits a reproducibility report.
 
-This is intentionally stronger than trusting a saved log, but it is not a complete hostile-code sandbox. See `docs/threat-model.md`.
+Evidence bundles pin the response, trace, and artifacts by SHA-256. Optional HMAC-SHA256 signatures detect any post-run modification to bundle metadata. This creates a portable unit that can be independently verified later.
+
+These controls are stronger than trusting saved prose or logs, but they are not a complete hostile-code sandbox. See `docs/threat-model.md`.
 
 ## Architecture
 
@@ -77,6 +76,7 @@ This is intentionally stronger than trusting a saved log, but it is not a comple
 Agent final response ──> claim extraction ──> atomic claims
 Runtime trace ─────────> event normalization ─> observed facts
 Replay manifest ───────> clean workspace rerun ─> reproducibility evidence
+Artifacts + trace ─────> signed evidence bundle ─> provenance evidence
                                          │
                                          ▼
                               deterministic verifiers
@@ -87,12 +87,11 @@ Replay manifest ───────> clean workspace rerun ─> reproducibilit
 
 ## Roadmap
 
-1. Signed evidence bundles and reproducible replay manifests.
-2. Container isolation and resource policies for untrusted reruns.
-3. Agent-framework adapters beyond OTLP.
-4. Expanded adversarial false-completion and grader-gaming benchmark.
-5. Cross-agent reliability reports.
-6. ClaimForge and Major Forest case studies.
+1. Container isolation and resource policies for untrusted reruns.
+2. Agent-framework adapters beyond OTLP.
+3. Expanded adversarial false-completion and grader-gaming benchmark.
+4. Cross-agent reliability reports.
+5. ClaimForge and Major Forest case studies.
 
 ## Development
 
@@ -104,4 +103,4 @@ pytest
 
 ## Status
 
-AgentProof is an early alpha. The initial release establishes the evidence model, deterministic verifiers, trace integrity checks, replay, CLI, reports, examples, tests, and CI. It is not yet a security boundary and should not be treated as one.
+AgentProof is an early alpha. It is already usable for deterministic evidence audits and reproducibility checks, but it is not yet a security boundary.

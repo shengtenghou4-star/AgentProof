@@ -8,10 +8,12 @@ from pathlib import Path
 from .adapters import convert_otlp_json
 from .audit import audit_run
 from .benchmark import run_benchmark
+from .bundle import build_evidence_bundle, verify_evidence_bundle, write_bundle
 from .manifest import build_manifest, verify_manifest
 from .recorder import record_command
 from .replay import replay
 from .reporting import render_html
+from .signing import load_key
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -39,6 +41,20 @@ def build_parser() -> argparse.ArgumentParser:
     verify = subparsers.add_parser("verify-manifest", help="Verify an artifact integrity manifest")
     verify.add_argument("manifest", type=Path)
     verify.add_argument("--root", type=Path, default=Path("."))
+
+    bundle = subparsers.add_parser("bundle", help="Create a portable evidence bundle")
+    bundle.add_argument("output", type=Path)
+    bundle.add_argument("--trace", type=Path, required=True)
+    bundle.add_argument("--response-file", type=Path, required=True)
+    bundle.add_argument("--artifact", action="append", default=[], type=Path)
+    bundle.add_argument("--root", type=Path, default=Path("."))
+    bundle.add_argument("--key-file", type=Path)
+    bundle.add_argument("--key-id", default="default")
+
+    verify_bundle = subparsers.add_parser("verify-bundle", help="Verify bundle signature and referenced files")
+    verify_bundle.add_argument("bundle", type=Path)
+    verify_bundle.add_argument("--root", type=Path, default=Path("."))
+    verify_bundle.add_argument("--key-file", type=Path)
 
     otel = subparsers.add_parser("import-otel", help="Convert OTLP/JSON spans into AgentProof JSONL")
     otel.add_argument("input", type=Path)
@@ -83,6 +99,25 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "verify-manifest":
             payload = json.loads(args.manifest.read_text(encoding="utf-8"))
             errors = verify_manifest(payload, root=args.root)
+            print(json.dumps({"valid": not errors, "errors": errors}, indent=2))
+            return int(bool(errors))
+        if args.command == "bundle":
+            key = load_key(args.key_file) if args.key_file else None
+            payload = build_evidence_bundle(
+                trace=args.trace,
+                response=args.response_file,
+                artifacts=args.artifact,
+                root=args.root,
+                signing_key=key,
+                key_id=args.key_id,
+            )
+            write_bundle(args.output, payload)
+            print(json.dumps({"output": str(args.output), "signed": key is not None}, indent=2))
+            return 0
+        if args.command == "verify-bundle":
+            payload = json.loads(args.bundle.read_text(encoding="utf-8"))
+            key = load_key(args.key_file) if args.key_file else None
+            errors = verify_evidence_bundle(payload, root=args.root, signing_key=key)
             print(json.dumps({"valid": not errors, "errors": errors}, indent=2))
             return int(bool(errors))
         if args.command == "import-otel":

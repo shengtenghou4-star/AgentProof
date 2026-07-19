@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from agentproof.bundle import build_evidence_bundle
+from agentproof.bundle import build_evidence_bundle, verify_evidence_bundle
 from agentproof.signing import load_key, sign_bundle, verify_bundle
 
 
@@ -15,7 +15,7 @@ def test_sign_and_verify_bundle():
     assert verify_bundle(signed, key) is False
 
 
-def test_build_bundle_hashes_inputs(tmp_path):
+def test_build_and_verify_bundle_hashes_inputs(tmp_path):
     trace = tmp_path / "trace.jsonl"
     response = tmp_path / "response.txt"
     artifact = tmp_path / "artifact.bin"
@@ -34,6 +34,22 @@ def test_build_bundle_hashes_inputs(tmp_path):
     assert bundle["trace"]["bytes"] == 3
     assert bundle["response"]["bytes"] == 4
     assert verify_bundle(bundle, b"x" * 32) is True
+    assert verify_evidence_bundle(bundle, root=tmp_path, signing_key=b"x" * 32) == []
+
+    artifact.write_bytes(b"tampered")
+    errors = verify_evidence_bundle(bundle, root=tmp_path, signing_key=b"x" * 32)
+    assert any("artifact" in error for error in errors)
+
+
+def test_bundle_rejects_path_outside_root(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    trace = tmp_path / "trace.jsonl"
+    response = root / "response.txt"
+    trace.write_text("{}", encoding="utf-8")
+    response.write_text("done", encoding="utf-8")
+    with pytest.raises(ValueError, match="outside bundle root"):
+        build_evidence_bundle(trace=trace, response=response, artifacts=[], root=root)
 
 
 def test_load_key_rejects_short_key(tmp_path):
