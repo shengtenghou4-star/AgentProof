@@ -92,6 +92,8 @@ jobs:
         run: agentproof benchmark --suite all --json benchmark-report.json
       - name: Fuzz claim extraction deterministically
         run: python scripts/fuzz_claims.py | tee fuzz-report.txt
+      - name: Run deterministic security controls
+        run: python scripts/security_controls.py --output security-controls.json
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -101,6 +103,7 @@ jobs:
             self-audit-summary.json
             benchmark-report.json
             fuzz-report.txt
+            security-controls.json
           if-no-files-found: error
 
   claimforge-case-study:
