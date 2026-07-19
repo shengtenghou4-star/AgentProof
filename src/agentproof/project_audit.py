@@ -67,7 +67,11 @@ def load_project_profile(path: str | Path) -> ProjectProfile:
         if not isinstance(raw, dict):
             raise ValueError(f"check {index} must be an object")
         command = raw.get("command")
-        if not isinstance(command, list) or not command or not all(isinstance(part, str) for part in command):
+        if (
+            not isinstance(command, list)
+            or not command
+            or not all(isinstance(part, str) for part in command)
+        ):
             raise ValueError(f"check {index} command must be a non-empty string list")
         claim = str(raw.get("claim") or "").strip()
         if not claim:
@@ -173,11 +177,16 @@ def audit_project(
     )
     (output_root / "audit-report.html").write_text(render_html(report), encoding="utf-8")
 
+    acceptable_statuses = {"verified", "partial"}
     passed = (
         all(item["passed"] for item in check_results)
         and all(item["passed"] for item in artifact_results)
         and report.integrity_ok
-        and not any(finding.status.value == "contradicted" for finding in report.findings)
+        and bool(report.findings)
+        and all(
+            finding.status.value in acceptable_statuses
+            for finding in report.findings
+        )
     )
     result = ProjectAuditResult(
         profile=profile.name,
