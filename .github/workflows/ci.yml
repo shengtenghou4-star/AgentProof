@@ -40,25 +40,21 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: pip install -e '.[dev]'
-      - name: Record test execution
-        run: agentproof record-command self-audit.jsonl pytest -ra -o addopts=
-      - name: Audit completion claim
+      - name: Run profile-driven project audit
         run: |
-          printf 'All tests passed.\n' > final-response.txt
-          agentproof audit self-audit.jsonl \
-            --response-file final-response.txt \
+          agentproof project-audit examples/agentproof-project-audit.json \
+            --source . \
+            --output-dir self-audit \
             --fail-under 100 \
-            --json self-audit-report.json \
-            --html self-audit-report.html
-      - name: Run adversarial benchmark
-        run: agentproof benchmark > benchmark-report.json
+            --json self-audit-summary.json
+      - name: Run 300-case perturbed benchmark
+        run: agentproof benchmark --suite extended --json benchmark-report.json
       - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: agentproof-self-audit
           path: |
-            self-audit.jsonl
-            self-audit-report.json
-            self-audit-report.html
+            self-audit/**
+            self-audit-summary.json
             benchmark-report.json
           if-no-files-found: error

@@ -9,11 +9,13 @@ from .adapters import convert_otlp_json
 from .aggregate import aggregate_reports
 from .audit import audit_run
 from .benchmark import run_benchmark
+from .benchmark_variants import run_extended_benchmark
 from .bundle import build_evidence_bundle, verify_evidence_bundle, write_bundle
 from .docker_replay import replay_in_docker
 from .io import load_events
 from .manifest import build_manifest, verify_manifest
 from .policy import evaluate_policy, load_policy
+from .project_audit import audit_project
 from .recorder import record_command
 from .replay import replay
 from .reporting import render_html
@@ -22,10 +24,14 @@ from .signing import load_key
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="agentproof", description="Evidence-based verification for AI agents")
+    parser = argparse.ArgumentParser(
+        prog="agentproof", description="Evidence-based verification for AI agents"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    audit = subparsers.add_parser("audit", help="Audit an agent response against an evidence trace")
+    audit = subparsers.add_parser(
+        "audit", help="Audit an agent response against an evidence trace"
+    )
     audit.add_argument("trace", type=Path)
     response = audit.add_mutually_exclusive_group(required=True)
     response.add_argument("--response", help="Agent response text")
@@ -46,7 +52,9 @@ def build_parser() -> argparse.ArgumentParser:
     summarize.add_argument("reports", nargs="+", type=Path)
     summarize.add_argument("--json", type=Path, dest="json_output")
 
-    record = subparsers.add_parser("record-command", help="Execute a command and append tamper-evident evidence")
+    record = subparsers.add_parser(
+        "record-command", help="Execute a command and append tamper-evident evidence"
+    )
     record.add_argument("trace", type=Path)
     record.add_argument("argv", nargs=argparse.REMAINDER)
 
@@ -55,7 +63,9 @@ def build_parser() -> argparse.ArgumentParser:
     manifest.add_argument("paths", nargs="+", type=Path)
     manifest.add_argument("--root", type=Path, default=Path("."))
 
-    verify = subparsers.add_parser("verify-manifest", help="Verify an artifact integrity manifest")
+    verify = subparsers.add_parser(
+        "verify-manifest", help="Verify an artifact integrity manifest"
+    )
     verify.add_argument("manifest", type=Path)
     verify.add_argument("--root", type=Path, default=Path("."))
 
@@ -68,7 +78,9 @@ def build_parser() -> argparse.ArgumentParser:
     bundle.add_argument("--key-file", type=Path)
     bundle.add_argument("--key-id", default="default")
 
-    verify_bundle = subparsers.add_parser("verify-bundle", help="Verify bundle signature and referenced files")
+    verify_bundle = subparsers.add_parser(
+        "verify-bundle", help="Verify bundle signature and referenced files"
+    )
     verify_bundle.add_argument("bundle", type=Path)
     verify_bundle.add_argument("--root", type=Path, default=Path("."))
     verify_bundle.add_argument("--key-file", type=Path)
@@ -89,11 +101,26 @@ def build_parser() -> argparse.ArgumentParser:
     rerun.add_argument("--pids-limit", type=int, default=256)
     rerun.add_argument("--allow-network", action="store_true")
 
+    project = subparsers.add_parser(
+        "project-audit", help="Run a profile-driven end-to-end project audit"
+    )
+    project.add_argument("profile", type=Path)
+    project.add_argument("--source", type=Path, default=Path("."))
+    project.add_argument(
+        "--output-dir", type=Path, default=Path("agentproof-project-audit")
+    )
+    project.add_argument("--json", type=Path, dest="json_output")
+    project.add_argument("--fail-under", type=float, default=None)
+
     server = subparsers.add_parser("serve", help="Run the local API and dashboard")
     server.add_argument("--host", default="127.0.0.1")
     server.add_argument("--port", type=int, default=8080)
 
-    subparsers.add_parser("benchmark", help="Run the built-in false-completion benchmark")
+    benchmark = subparsers.add_parser(
+        "benchmark", help="Run false-completion benchmark suites"
+    )
+    benchmark.add_argument("--suite", choices=("core", "extended"), default="core")
+    benchmark.add_argument("--json", type=Path, dest="json_output")
     return parser
 
 
@@ -101,7 +128,11 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if args.command == "audit":
-            response = args.response if args.response is not None else args.response_file.read_text(encoding="utf-8")
+            response = (
+                args.response
+                if args.response is not None
+                else args.response_file.read_text(encoding="utf-8")
+            )
             report = audit_run(args.trace, response, run_id=args.run_id)
             payload = report.to_dict()
             rendered = json.dumps(payload, indent=2, sort_keys=True)
@@ -136,7 +167,9 @@ def main(argv: list[str] | None = None) -> int:
             return record_command(args.trace, args.argv)
         if args.command == "manifest":
             payload = build_manifest(args.paths, root=args.root)
-            args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            args.output.write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
             print(json.dumps(payload, indent=2))
             return 0
         if args.command == "verify-manifest":
@@ -146,7 +179,14 @@ def main(argv: list[str] | None = None) -> int:
             return int(bool(errors))
         if args.command == "bundle":
             key = load_key(args.key_file) if args.key_file else None
-            payload = build_evidence_bundle(trace=args.trace, response=args.response_file, artifacts=args.artifact, root=args.root, signing_key=key, key_id=args.key_id)
+            payload = build_evidence_bundle(
+                trace=args.trace,
+                response=args.response_file,
+                artifacts=args.artifact,
+                root=args.root,
+                signing_key=key,
+                key_id=args.key_id,
+            )
             write_bundle(args.output, payload)
             print(json.dumps({"output": str(args.output), "signed": key is not None}, indent=2))
             return 0
@@ -161,7 +201,18 @@ def main(argv: list[str] | None = None) -> int:
             events = convert_otlp_json(payload)
             with args.output.open("w", encoding="utf-8") as handle:
                 for event in events:
-                    handle.write(json.dumps({"event_type": event.event_type, "timestamp": event.timestamp, "data": event.data, "source": event.source}, sort_keys=True) + "\n")
+                    handle.write(
+                        json.dumps(
+                            {
+                                "event_type": event.event_type,
+                                "timestamp": event.timestamp,
+                                "data": event.data,
+                                "source": event.source,
+                            },
+                            sort_keys=True,
+                        )
+                        + "\n"
+                    )
             print(json.dumps({"events": len(events), "output": str(args.output)}, indent=2))
             return 0
         if args.command == "replay":
@@ -177,21 +228,44 @@ def main(argv: list[str] | None = None) -> int:
                     keep_workspace=args.keep_workspace,
                 )
             else:
-                result = replay(args.manifest, source=args.source, keep_workspace=args.keep_workspace, clean_environment=not args.inherit_environment)
+                result = replay(
+                    args.manifest,
+                    source=args.source,
+                    keep_workspace=args.keep_workspace,
+                    clean_environment=not args.inherit_environment,
+                )
             rendered = json.dumps(result.to_dict(), indent=2, sort_keys=True)
             if args.json_output:
                 args.json_output.write_text(rendered + "\n", encoding="utf-8")
             print(rendered)
             return 0 if result.reproducible else 3
+        if args.command == "project-audit":
+            result = audit_project(
+                args.profile,
+                source=args.source,
+                output_dir=args.output_dir,
+            )
+            payload = result.to_dict()
+            rendered = json.dumps(payload, indent=2, sort_keys=True)
+            if args.json_output:
+                args.json_output.write_text(rendered + "\n", encoding="utf-8")
+            print(rendered)
+            score = float(payload["audit"]["score"])
+            if args.fail_under is not None and score < args.fail_under:
+                return 6
+            return 0 if result.passed else 6
         if args.command == "serve":
             if not 1 <= args.port <= 65535:
                 raise ValueError("port must be between 1 and 65535")
             serve(args.host, args.port)
             return 0
         if args.command == "benchmark":
-            result = run_benchmark()
-            print(json.dumps(result, indent=2))
-            return 0 if result["accuracy"] == 1.0 else 4
+            result = run_extended_benchmark() if args.suite == "extended" else run_benchmark()
+            rendered = json.dumps(result, indent=2, sort_keys=True)
+            if args.json_output:
+                args.json_output.write_text(rendered + "\n", encoding="utf-8")
+            print(rendered)
+            return 0 if result["accuracy"] == 1.0 and result["false_accepts"] == 0 else 4
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"agentproof: {exc}", file=sys.stderr)
         return 1

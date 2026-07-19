@@ -6,20 +6,45 @@ from .models import Claim
 
 
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("all_tests_passed", re.compile(r"\b(all|every)\s+(?:the\s+)?tests?\s+(?:have\s+)?passed\b", re.I)),
-    ("deployed", re.compile(r"\b(?:api|service|application|app)\s+(?:has\s+been\s+|is\s+)?deployed\b", re.I)),
-    ("completed", re.compile(r"\b(?:task|work|implementation|project)\s+(?:is|has been)\s+(?:fully\s+)?completed\b", re.I)),
+    (
+        "all_tests_passed",
+        re.compile(
+            r"\b(?:all|every(?:\s+one\s+of)?)\s+(?:the\s+)?tests?\s+(?:have\s+)?passed\b",
+            re.I,
+        ),
+    ),
+    (
+        "deployed",
+        re.compile(
+            r"\b(?:api|service|application|app)\s+(?:has\s+been\s+|is\s+)?deployed\b",
+            re.I,
+        ),
+    ),
+    (
+        "completed",
+        re.compile(
+            r"\b(?:task|work|implementation|project)\s+(?:is|has been)\s+(?:fully\s+)?completed\b",
+            re.I,
+        ),
+    ),
 ]
 
 _METRIC = re.compile(
-    r"\b(?P<name>roc[- ]?auc|auc|accuracy|f1|precision|recall)\s*(?:=|:|of|reached|is|was)?\s*(?P<value>0(?:\.\d+)?|1(?:\.0+)?)\b",
+    r"\b(?P<name>roc[- ]?auc|auc|accuracy|f1|precision|recall)\s*"
+    r"(?:=|:|of|reached|is|was)?\s*(?P<value>0(?:\.\d+)?|1(?:\.0+)?)\b",
     re.I,
 )
 _MODEL = re.compile(
-    r"\b(?:used|called|ran|invoked)\s+(?:(?P<provider>[A-Za-z0-9_.-]+)[/:])?(?P<model>[A-Za-z][A-Za-z0-9_.-]{2,})\b",
+    r"\b(?:used|called|ran|invoked)\s+"
+    r"(?:(?P<provider>[A-Za-z0-9_.-]+)[/:])?"
+    r"(?P<model>[A-Za-z][A-Za-z0-9_.-]{2,})\b",
     re.I,
 )
-_FILE = re.compile(r"\b(?:created|generated|wrote)\s+(?:the\s+)?(?:file\s+)?[`'\"]?(?P<path>[\w./-]+\.[A-Za-z0-9]+)[`'\"]?", re.I)
+_FILE = re.compile(
+    r"\b(?:created|generated|wrote)\s+(?:the\s+)?(?:file\s+)?"
+    r"[`'\"]?(?P<path>[\w./-]+\.[A-Za-z0-9]+)[`'\"]?",
+    re.I,
+)
 
 
 def extract_claims(text: str) -> list[Claim]:
@@ -27,7 +52,11 @@ def extract_claims(text: str) -> list[Claim]:
 
     claims: list[Claim] = []
 
-    def add(kind: str, matched_text: str, expected: dict[str, object] | None = None) -> None:
+    def add(
+        kind: str,
+        matched_text: str,
+        expected: dict[str, object] | None = None,
+    ) -> None:
         claims.append(
             Claim(
                 claim_id=f"C{len(claims) + 1}",
@@ -45,7 +74,13 @@ def extract_claims(text: str) -> list[Claim]:
         add(
             "metric",
             match.group(0),
-            {"name": match.group("name").lower().replace(" ", "-").replace("roc-auc", "auc"), "value": float(match.group("value"))},
+            {
+                "name": match.group("name")
+                .lower()
+                .replace(" ", "-")
+                .replace("roc-auc", "auc"),
+                "value": float(match.group("value")),
+            },
         )
 
     for match in _MODEL.finditer(text):

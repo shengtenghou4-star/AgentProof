@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 2026-07-19
+
+- added profile-driven end-to-end project audits;
+- added command execution, artifact hashing, claim generation, JSON/HTML output and source-path containment in one workflow;
+- expanded AgentProofBench to a deterministic 304-case perturbation suite;
+- added paraphrase, Markdown, prefix, suffix and line-break robustness coverage;
+- expanded conservative test-completion claim parsing;
+- upgraded CI to audit the whole AgentProof project and run the extended benchmark.
+
 ## 0.3.0 — 2026-07-19
 
 - added an OpenAI-compatible model-route attestation proxy;
