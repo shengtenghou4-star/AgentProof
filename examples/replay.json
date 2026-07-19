@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "name": "unit-tests",
+      "command": ["python", "-m", "pytest", "-q"],
+      "timeout_seconds": 300,
+      "expected_exit_code": 0
+    },
+    {
+      "name": "benchmark",
+      "command": ["python", "-m", "agentproof", "benchmark"],
+      "timeout_seconds": 120,
+      "expected_exit_code": 0
+    }
+  ]
+}
