@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentproof.dev/schemas/bundle.schema.json",
+  "title": "AgentProof Evidence Bundle",
+  "type": "object",
+  "required": ["schema_version", "created_at", "trace", "response", "artifacts"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "created_at": {"type": "string"},
+    "trace": {"type": "object"},
+    "response": {"type": "object"},
+    "artifacts": {"type": "object"},
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "key_id", "value"],
+      "properties": {
+        "algorithm": {"const": "HMAC-SHA256"},
+        "key_id": {"type": "string"},
+        "value": {"type": "string"}
+      }
+    }
+  }
+}
