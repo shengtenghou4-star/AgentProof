@@ -1,0 +1,6 @@
+{"event_type":"model_call","timestamp":"2026-07-19T09:00:00Z","data":{"provider":"openai","model":"gpt-5.6","request_id":"req_demo"}}
+{"event_type":"command","timestamp":"2026-07-19T09:01:00Z","data":{"command":"pytest -q","exit_code":1}}
+{"event_type":"test_summary","timestamp":"2026-07-19T09:01:08Z","data":{"total":100,"passed":96,"failed":4,"errors":0,"exit_code":1}}
+{"event_type":"metric","timestamp":"2026-07-19T09:02:00Z","data":{"name":"auc","value":0.757,"independently_computed":true}}
+{"event_type":"artifact","timestamp":"2026-07-19T09:03:00Z","data":{"path":"model.pkl","exists":true,"sha256":"8ff3f75a0f0a"}}
+{"event_type":"healthcheck","timestamp":"2026-07-19T09:04:00Z","data":{"url":"http://localhost:8000/health","status_code":503}}
