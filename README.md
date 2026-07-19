@@ -20,14 +20,15 @@ The v0.5.0 internal validation lane currently demonstrates:
 
 | Evidence | Result |
 |---|---:|
-| AgentProof test suite | 76 passed on Python 3.10, 3.11 and 3.12 |
+| AgentProof test suite | 79 passed on Python 3.10, 3.11 and 3.12 |
 | Strict self-audit | 100/100; 5/5 claims verified; hash chain valid |
 | Core controlled benchmark | 38/38 correct; 0/25 unsafe false accepts |
 | Language/format perturbation suite | 304/304 correct; 0/200 unsafe false accepts |
 | Layout/context holdout-style suite | 1,216/1,216 correct; 0/800 unsafe false accepts |
 | Combined deterministic corpus | 1,558 cases; 1,025 unsafe; zero false accepts |
-| Deterministic parser fuzzing | 5,000 generated cases with a fixed seed |
-| Source coverage | 78.2% line coverage; 64.2% branch coverage |
+| Deterministic parser fuzzing | 5,000 generated cases; fixed seed; 0.27 seconds in CI |
+| Deterministic security controls | 39 Python files scanned; zero blocking findings |
+| Source coverage | 78.4% line coverage; 65.2% branch coverage |
 | Package validation | wheel + sdist build; clean-venv wheel install and CLI smoke pass |
 | ClaimForge cross-project audit | 54 tests, lint and public-claim validation pass; audit 100/100 |
 
@@ -45,6 +46,7 @@ These are **controlled, repository-owned validation results**. They are strong r
 - **Evidence integrity** — append-only SHA-256 event chains, artifact manifests and signed portable bundles.
 - **Privacy controls** — common secret redaction, bounded output capture, full-output digests and hashed transcript content.
 - **Runtime provenance** — Python, platform, dependency, Git and selected environment fingerprints.
+- **Security controls** — deterministic AST checks reject `shell=True`, dynamic `eval`/`exec`, unsafe pickle deserialization, credential-like source strings and missing boundary documents.
 - **Reproducible replay** — clean local workspaces and network-denied, resource-limited Docker reruns.
 - **Runtime adapters** — Claude Code, Codex, OpenAI Responses, generic OpenAI Agents/LangGraph-style traces and OTLP/JSON.
 - **Delivery** — CLI, Python API, local REST API/dashboard, GitHub Action, interactive static demo, JSON, HTML, SARIF and JUnit.
@@ -152,7 +154,7 @@ Audit reports ─────────> JSON/HTML/SARIF/JUnit ─> human and 
 
 ## Internal validation versus external validation
 
-The coding-stage definition of done includes implementation, tests, fuzzing, controlled benchmarks, package validation, self-audit, ClaimForge cross-project audit, documentation and the public demo. See [`docs/INTERNAL_COMPLETION.md`](docs/INTERNAL_COMPLETION.md).
+The coding-stage definition of done includes implementation, tests, fuzzing, controlled benchmarks, security controls, package validation, self-audit, ClaimForge cross-project audit, documentation and the public demo. See [`docs/INTERNAL_COMPLETION.md`](docs/INTERNAL_COMPLETION.md).
 
 The following are deliberately deferred because more code cannot manufacture them:
 
@@ -187,6 +189,7 @@ pytest
 coverage run -m pytest
 coverage report
 python scripts/fuzz_claims.py
+python scripts/security_controls.py
 python -m build
 ```
 
@@ -197,6 +200,7 @@ python -m build
 - Hash chains and signatures depend on the integrity of their verifier, keys and trust roots.
 - Docker replay reduces ambient privilege but is not a safe host for arbitrary hostile native code.
 - Redaction covers common credential forms, not every possible secret representation.
+- Deterministic security controls cover explicit prohibited patterns, not every possible vulnerability.
 - Project audits verify declared acceptance criteria; undeclared business correctness remains outside the profile.
 - Runtime adapters are tested against supported record shapes and may require updates as vendor formats evolve.
 - The ClaimForge case study is an internally operated, cross-repository reproducibility test—not third-party assurance.
