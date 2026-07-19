@@ -78,8 +78,8 @@ class TraceRecorder:
             result = subprocess.CompletedProcess(
                 args=list(command),
                 returncode=124,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
+                stdout=_timeout_text(exc.stdout),
+                stderr=_timeout_text(exc.stderr),
             )
             timed_out = True
         duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
@@ -105,6 +105,27 @@ class TraceRecorder:
             return str(json.loads(last)["data"]["event_hash"])
         except (KeyError, TypeError, json.JSONDecodeError) as exc:
             raise ValueError("Existing trace does not end in a valid chained event") from exc
+
+
+def record_command(trace: str | Path, argv: Sequence[str]) -> int:
+    """Execute argv, record tamper-evident evidence, mirror output, and return its exit code."""
+
+    if not argv:
+        raise ValueError("record_command requires a non-empty argv sequence")
+    result = TraceRecorder(trace).run_command(argv)
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        import sys
+
+        print(result.stderr, end="", file=sys.stderr)
+    return int(result.returncode)
+
+
+def _timeout_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    return value.decode(errors="replace") if isinstance(value, bytes) else value
 
 
 def _sha256_file(path: Path) -> str:
