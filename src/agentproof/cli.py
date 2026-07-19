@@ -17,6 +17,7 @@ from .policy import evaluate_policy, load_policy
 from .recorder import record_command
 from .replay import replay
 from .reporting import render_html
+from .server import serve
 from .signing import load_key
 
 
@@ -87,6 +88,10 @@ def build_parser() -> argparse.ArgumentParser:
     rerun.add_argument("--cpus", type=float, default=1.0)
     rerun.add_argument("--pids-limit", type=int, default=256)
     rerun.add_argument("--allow-network", action="store_true")
+
+    server = subparsers.add_parser("serve", help="Run the local API and dashboard")
+    server.add_argument("--host", default="127.0.0.1")
+    server.add_argument("--port", type=int, default=8080)
 
     subparsers.add_parser("benchmark", help="Run the built-in false-completion benchmark")
     return parser
@@ -178,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
                 args.json_output.write_text(rendered + "\n", encoding="utf-8")
             print(rendered)
             return 0 if result.reproducible else 3
+        if args.command == "serve":
+            if not 1 <= args.port <= 65535:
+                raise ValueError("port must be between 1 and 65535")
+            serve(args.host, args.port)
+            return 0
         if args.command == "benchmark":
             result = run_benchmark()
             print(json.dumps(result, indent=2))

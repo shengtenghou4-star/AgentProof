@@ -18,6 +18,7 @@ The project starts from a simple rule: **do not trust completion language; verif
 - AgentProofBench with overall and per-category adversarial accuracy;
 - cross-run reliability aggregation;
 - OTLP/JSON import for model and tool spans;
+- dependency-free local REST API and interactive dashboard;
 - reusable GitHub Action, JSON/HTML reports, schemas, and CI thresholds;
 - zero mandatory runtime dependencies.
 
@@ -37,6 +38,7 @@ agentproof bundle evidence.json --trace run.jsonl --response-file final-response
 agentproof verify-bundle evidence.json --root . --key-file .agentproof-key
 agentproof summarize run-1.json run-2.json --json reliability.json
 agentproof benchmark
+agentproof serve --host 127.0.0.1 --port 8080
 ```
 
 ## Evidence gates and adversarial detection
@@ -45,13 +47,13 @@ Policies convert evidence quality into enforceable release criteria: minimum sco
 
 AgentProof also scans execution records for observable gaming signals rather than waiting for the final answer to disclose them. The alpha detectors cover protected evaluator-file modifications, suppressed command failures, stale artifact reuse, mock health checks, unauthorized acceptance changes, best-seed-only reporting, and future-data leakage.
 
-## Replay and provenance
+## Replay, provenance, and integration
 
 Local replay copies source into a fresh temporary workspace, strips common local-state directories, reduces inherited environment variables, executes argv commands without a shell, and emits a reproducibility report.
 
-Docker replay adds network denial, capability dropping, `no-new-privileges`, memory/CPU/process limits, and disposable mounts. See `docs/container-replay.md` for assumptions and limitations.
+Docker replay adds network denial, capability dropping, `no-new-privileges`, memory/CPU/process limits, and disposable mounts. Evidence bundles pin responses, traces, and artifacts by SHA-256 and can be signed with HMAC-SHA256.
 
-Evidence bundles pin responses, traces, and artifacts by SHA-256. Optional HMAC-SHA256 signatures detect post-run modification to bundle metadata.
+The local server exposes `/api/audit`, `/api/gate`, `/health`, and an interactive dashboard at `/`. It accepts inline evidence only and does not execute uploaded commands.
 
 ## Architecture
 
@@ -63,6 +65,7 @@ Acceptance policy ─────> evidence gate ──────────>
 Replay manifest ───────> local/container rerun ──> reproducibility evidence
 Artifacts + trace ─────> signed bundle ──────────> provenance evidence
 Audit reports ─────────> reliability aggregation > cross-run comparison
+API/dashboard ─────────> integration surface ────> human and machine use
 ```
 
 ## Documentation
@@ -71,13 +74,14 @@ Audit reports ─────────> reliability aggregation > cross-run c
 - `docs/container-replay.md`
 - `docs/benchmark.md`
 - `docs/reliability-reports.md`
+- `docs/api.md`
 
 ## Roadmap
 
 1. Native adapters beyond OTLP.
 2. Multi-step and paraphrase-rich benchmark expansion.
 3. ClaimForge and Major Forest case studies.
-4. Public alpha packaging and demo dashboard.
+4. Public alpha packaging and hosted demo.
 
 ## Development
 
@@ -89,4 +93,4 @@ pytest
 
 ## Status
 
-AgentProof is an early alpha. It is usable for deterministic evidence audits, acceptance gates, provenance verification, and reproducibility checks. It is not a formal security boundary.
+AgentProof is an early alpha. It is usable for deterministic evidence audits, acceptance gates, provenance verification, reproducibility checks, and local API integrations. It is not a formal security boundary.
