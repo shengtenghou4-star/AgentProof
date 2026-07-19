@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentproof"
-version = "0.2.0"
+version = "0.3.0"
 description = "Evidence-based verification for autonomous AI agent claims"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,6 +22,7 @@ classifiers = [
 
 [project.scripts]
 agentproof = "agentproof.cli:main"
+agentproof-proxy = "agentproof.proxy_cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
