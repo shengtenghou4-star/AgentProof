@@ -10,6 +10,7 @@ from .aggregate import aggregate_reports
 from .audit import audit_run
 from .benchmark import run_benchmark
 from .bundle import build_evidence_bundle, verify_evidence_bundle, write_bundle
+from .docker_replay import replay_in_docker
 from .io import load_events
 from .manifest import build_manifest, verify_manifest
 from .policy import evaluate_policy, load_policy
@@ -75,12 +76,17 @@ def build_parser() -> argparse.ArgumentParser:
     otel.add_argument("input", type=Path)
     otel.add_argument("output", type=Path)
 
-    rerun = subparsers.add_parser("replay", help="Re-run declared checks in a clean copied workspace")
+    rerun = subparsers.add_parser("replay", help="Re-run declared checks in a fresh workspace")
     rerun.add_argument("manifest", type=Path)
     rerun.add_argument("--source", type=Path, default=Path("."))
     rerun.add_argument("--json", type=Path, dest="json_output")
     rerun.add_argument("--keep-workspace", action="store_true")
     rerun.add_argument("--inherit-environment", action="store_true")
+    rerun.add_argument("--docker-image")
+    rerun.add_argument("--memory", default="1g")
+    rerun.add_argument("--cpus", type=float, default=1.0)
+    rerun.add_argument("--pids-limit", type=int, default=256)
+    rerun.add_argument("--allow-network", action="store_true")
 
     subparsers.add_parser("benchmark", help="Run the built-in false-completion benchmark")
     return parser
@@ -154,9 +160,20 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"events": len(events), "output": str(args.output)}, indent=2))
             return 0
         if args.command == "replay":
-            result = replay(args.manifest, source=args.source, keep_workspace=args.keep_workspace, clean_environment=not args.inherit_environment)
-            payload = result.to_dict()
-            rendered = json.dumps(payload, indent=2, sort_keys=True)
+            if args.docker_image:
+                result = replay_in_docker(
+                    args.manifest,
+                    source=args.source,
+                    image=args.docker_image,
+                    memory=args.memory,
+                    cpus=args.cpus,
+                    pids_limit=args.pids_limit,
+                    allow_network=args.allow_network,
+                    keep_workspace=args.keep_workspace,
+                )
+            else:
+                result = replay(args.manifest, source=args.source, keep_workspace=args.keep_workspace, clean_environment=not args.inherit_environment)
+            rendered = json.dumps(result.to_dict(), indent=2, sort_keys=True)
             if args.json_output:
                 args.json_output.write_text(rendered + "\n", encoding="utf-8")
             print(rendered)

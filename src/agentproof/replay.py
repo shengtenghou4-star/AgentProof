@@ -38,11 +38,13 @@ class ReplayResult:
     reproducible: bool
     workspace: str
     steps: list[ReplayStepResult]
+    backend: str = "local"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "reproducible": self.reproducible,
             "workspace": self.workspace,
+            "backend": self.backend,
             "steps": [asdict(step) for step in self.steps],
         }
 
@@ -62,12 +64,15 @@ def load_replay_manifest(path: Path) -> list[ReplayStep]:
             raise ValueError(f"step {index} command must be an argv list, not a shell string")
         if not isinstance(command, list) or not command or not all(isinstance(part, str) for part in command):
             raise ValueError(f"step {index} command must be a non-empty string list")
+        timeout_seconds = int(raw.get("timeout_seconds", 300))
+        if timeout_seconds < 1:
+            raise ValueError(f"step {index} timeout_seconds must be positive")
         steps.append(
             ReplayStep(
                 name=str(raw.get("name") or f"step-{index + 1}"),
                 command=list(command),
                 cwd=str(raw.get("cwd") or "."),
-                timeout_seconds=int(raw.get("timeout_seconds", 300)),
+                timeout_seconds=timeout_seconds,
                 expected_exit_code=int(raw.get("expected_exit_code", 0)),
             )
         )
@@ -84,17 +89,13 @@ def replay(
     steps = load_replay_manifest(manifest)
     workspace_path = Path(tempfile.mkdtemp(prefix="agentproof-replay-"))
     copied_root = workspace_path / "workspace"
-    _copy_source(source.resolve(), copied_root)
+    copy_source(source.resolve(), copied_root)
 
-    environment = _clean_environment() if clean_environment else dict(os.environ)
+    environment = clean_environment() if clean_environment else dict(os.environ)
     results: list[ReplayStepResult] = []
     try:
         for step in steps:
-            cwd = (copied_root / step.cwd).resolve()
-            if copied_root.resolve() not in (cwd, *cwd.parents):
-                raise ValueError(f"step '{step.name}' cwd escapes replay workspace")
-            if not cwd.exists():
-                raise FileNotFoundError(f"step '{step.name}' cwd does not exist: {step.cwd}")
+            cwd = resolve_step_cwd(copied_root, step)
             started = time.monotonic()
             try:
                 completed = subprocess.run(
@@ -132,8 +133,8 @@ def replay(
                         passed=False,
                         timed_out=True,
                         duration_seconds=round(duration, 6),
-                        stdout=_decode_timeout_stream(exc.stdout),
-                        stderr=_decode_timeout_stream(exc.stderr),
+                        stdout=decode_timeout_stream(exc.stdout),
+                        stderr=decode_timeout_stream(exc.stderr),
                     )
                 )
                 break
@@ -141,13 +142,13 @@ def replay(
                 break
     finally:
         reproducible = bool(results) and len(results) == len(steps) and all(step.passed for step in results)
-        result = ReplayResult(reproducible=reproducible, workspace=str(copied_root), steps=results)
+        result = ReplayResult(reproducible=reproducible, workspace=str(copied_root), steps=results, backend="local")
         if not keep_workspace:
             shutil.rmtree(workspace_path, ignore_errors=True)
     return result
 
 
-def _copy_source(source: Path, destination: Path) -> None:
+def copy_source(source: Path, destination: Path) -> None:
     ignored_names = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
 
     def ignore(_directory: str, names: list[str]) -> set[str]:
@@ -156,26 +157,25 @@ def _copy_source(source: Path, destination: Path) -> None:
     shutil.copytree(source, destination, ignore=ignore)
 
 
-def _clean_environment() -> dict[str, str]:
+def resolve_step_cwd(root: Path, step: ReplayStep) -> Path:
+    cwd = (root / step.cwd).resolve()
+    root = root.resolve()
+    if root not in (cwd, *cwd.parents):
+        raise ValueError(f"step '{step.name}' cwd escapes replay workspace")
+    if not cwd.exists():
+        raise FileNotFoundError(f"step '{step.name}' cwd does not exist: {step.cwd}")
+    return cwd
+
+
+def clean_environment() -> dict[str, str]:
     allowed = {
-        "PATH",
-        "PATHEXT",
-        "SYSTEMROOT",
-        "WINDIR",
-        "COMSPEC",
-        "TMP",
-        "TEMP",
-        "HOME",
-        "USERPROFILE",
-        "LANG",
-        "LC_ALL",
-        "PYTHONUTF8",
-        "PYTHONIOENCODING",
+        "PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC", "TMP", "TEMP", "HOME", "USERPROFILE",
+        "LANG", "LC_ALL", "PYTHONUTF8", "PYTHONIOENCODING",
     }
     return {key: value for key, value in os.environ.items() if key in allowed}
 
 
-def _decode_timeout_stream(value: str | bytes | None) -> str:
+def decode_timeout_stream(value: str | bytes | None) -> str:
     if value is None:
         return ""
     return value.decode(errors="replace") if isinstance(value, bytes) else value
