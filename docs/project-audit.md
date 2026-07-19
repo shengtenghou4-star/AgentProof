@@ -10,7 +10,7 @@ A profile declares commands, the claims those commands are meant to support, and
   "checks": [
     {
       "name": "tests",
-      "command": ["python", "-m", "pytest", "-q"],
+      "command": ["python", "-m", "pytest", "-ra"],
       "claim": "All tests passed.",
       "timeout_seconds": 300,
       "expected_exit_code": 0
@@ -42,4 +42,4 @@ The output directory contains:
 - `audit-report.html`: a human-readable audit;
 - `project-audit.json`: command, artifact and overall project result.
 
-Project profiles reject shell strings, source-directory escapes and artifact path traversal. A passing project audit requires expected command exit codes, all declared artifacts, a valid hash chain and no contradicted claim.
+Project profiles reject shell strings, source-directory escapes and artifact path traversal. A passing project audit requires expected command exit codes, all declared artifacts, a valid hash chain, at least one auditable claim, and no unsupported or contradicted finding.
