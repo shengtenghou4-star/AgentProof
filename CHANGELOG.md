@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 — 2026-07-19
+
+- added structured claims, named acceptance-check verification and negation-safe extraction;
+- added common-secret redaction, bounded command evidence and full-output digests;
+- added Python/platform/dependency/Git/environment provenance fingerprints;
+- added SARIF and JUnit reports plus strict project profiles and expected artifact digests;
+- added automatic project-profile discovery;
+- added Codex and generic OpenAI Agents/LangGraph-style trace adapters;
+- added a 1,216-case deterministic layout/context holdout-style benchmark and a 5,000-case fixed-seed parser fuzz harness;
+- added a real cross-repository ClaimForge project-audit lane;
+- added coverage, wheel/sdist builds, clean-wheel installation and package smoke gates;
+- added a standalone interactive demonstration and GitHub Pages workflow;
+- added evidence-claims, internal-completion, technical-report, security, contribution and citation documentation;
+- changed project status from early alpha to beta within the stated application-layer scope.
+
 ## 0.4.0 — 2026-07-19
 
 - added profile-driven end-to-end project audits;
