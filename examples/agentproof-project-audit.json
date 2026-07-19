@@ -1,0 +1,13 @@
+{
+  "name": "agentproof-self-audit",
+  "checks": [
+    {
+      "name": "test-suite",
+      "command": ["python", "-m", "pytest", "-q"],
+      "claim": "All tests passed.",
+      "timeout_seconds": 300,
+      "expected_exit_code": 0
+    }
+  ],
+  "artifacts": []
+}
