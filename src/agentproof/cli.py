@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .adapters import convert_otlp_json
+from .aggregate import aggregate_reports
 from .audit import audit_run
 from .benchmark import run_benchmark
 from .bundle import build_evidence_bundle, verify_evidence_bundle, write_bundle
@@ -27,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     response = audit.add_mutually_exclusive_group(required=True)
     response.add_argument("--response", help="Agent response text")
     response.add_argument("--response-file", type=Path, help="File containing the agent response")
+    audit.add_argument("--run-id", default="local")
     audit.add_argument("--json", type=Path, dest="json_output")
     audit.add_argument("--html", type=Path, dest="html_output")
     audit.add_argument("--fail-under", type=float, default=None)
@@ -35,7 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("trace", type=Path)
     gate.add_argument("policy", type=Path)
     gate.add_argument("--response-file", type=Path, required=True)
+    gate.add_argument("--run-id", default="local")
     gate.add_argument("--json", type=Path, dest="json_output")
+
+    summarize = subparsers.add_parser("summarize", help="Aggregate reliability across audit reports")
+    summarize.add_argument("reports", nargs="+", type=Path)
+    summarize.add_argument("--json", type=Path, dest="json_output")
 
     record = subparsers.add_parser("record-command", help="Execute a command and append tamper-evident evidence")
     record.add_argument("trace", type=Path)
@@ -84,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "audit":
             response = args.response if args.response is not None else args.response_file.read_text(encoding="utf-8")
-            report = audit_run(args.trace, response)
+            report = audit_run(args.trace, response, run_id=args.run_id)
             payload = report.to_dict()
             rendered = json.dumps(payload, indent=2, sort_keys=True)
             if args.json_output:
@@ -97,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "gate":
             response = args.response_file.read_text(encoding="utf-8")
-            report = audit_run(args.trace, response)
+            report = audit_run(args.trace, response, run_id=args.run_id)
             result = evaluate_policy(report, load_events(args.trace), load_policy(args.policy))
             payload = {"audit": report.to_dict(), "policy": result.to_dict()}
             rendered = json.dumps(payload, indent=2, sort_keys=True)
@@ -105,6 +112,13 @@ def main(argv: list[str] | None = None) -> int:
                 args.json_output.write_text(rendered + "\n", encoding="utf-8")
             print(rendered)
             return 0 if result.passed else 5
+        if args.command == "summarize":
+            payload = aggregate_reports(args.reports)
+            rendered = json.dumps(payload, indent=2, sort_keys=True)
+            if args.json_output:
+                args.json_output.write_text(rendered + "\n", encoding="utf-8")
+            print(rendered)
+            return 0
         if args.command == "record-command":
             if not args.argv:
                 raise ValueError("record-command requires an argv command")
@@ -121,14 +135,7 @@ def main(argv: list[str] | None = None) -> int:
             return int(bool(errors))
         if args.command == "bundle":
             key = load_key(args.key_file) if args.key_file else None
-            payload = build_evidence_bundle(
-                trace=args.trace,
-                response=args.response_file,
-                artifacts=args.artifact,
-                root=args.root,
-                signing_key=key,
-                key_id=args.key_id,
-            )
+            payload = build_evidence_bundle(trace=args.trace, response=args.response_file, artifacts=args.artifact, root=args.root, signing_key=key, key_id=args.key_id)
             write_bundle(args.output, payload)
             print(json.dumps({"output": str(args.output), "signed": key is not None}, indent=2))
             return 0
@@ -143,21 +150,11 @@ def main(argv: list[str] | None = None) -> int:
             events = convert_otlp_json(payload)
             with args.output.open("w", encoding="utf-8") as handle:
                 for event in events:
-                    handle.write(json.dumps({
-                        "event_type": event.event_type,
-                        "timestamp": event.timestamp,
-                        "data": event.data,
-                        "source": event.source,
-                    }, sort_keys=True) + "\n")
+                    handle.write(json.dumps({"event_type": event.event_type, "timestamp": event.timestamp, "data": event.data, "source": event.source}, sort_keys=True) + "\n")
             print(json.dumps({"events": len(events), "output": str(args.output)}, indent=2))
             return 0
         if args.command == "replay":
-            result = replay(
-                args.manifest,
-                source=args.source,
-                keep_workspace=args.keep_workspace,
-                clean_environment=not args.inherit_environment,
-            )
+            result = replay(args.manifest, source=args.source, keep_workspace=args.keep_workspace, clean_environment=not args.inherit_environment)
             payload = result.to_dict()
             rendered = json.dumps(payload, indent=2, sort_keys=True)
             if args.json_output:
