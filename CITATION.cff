@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use AgentProof in research or evaluation, cite the repository and the exact commit."
+title: "AgentProof: Evidence-Based Verification for Autonomous AI Agents"
+type: software
+authors:
+  - family-names: Hou
+    given-names: Shengteng
+repository-code: "https://github.com/shengtenghou4-star/8"
+url: "https://shengtenghou4-star.github.io/8/"
+license: Apache-2.0
+version: 0.5.0
+date-released: 2026-07-19
+keywords:
+  - AI agents
+  - verification
+  - reproducibility
+  - model route attestation
+  - evidence integrity
+abstract: >-
+  AgentProof is an open-source framework that maps autonomous-agent claims to
+  observable execution evidence, verifies model routes and artifacts, detects
+  covered false-completion and evaluation-gaming behavior, replays declared
+  checks, and emits machine-readable audit reports.
