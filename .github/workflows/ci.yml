@@ -41,7 +41,7 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: pip install -e '.[dev]'
       - name: Record test execution
-        run: agentproof record-command self-audit.jsonl pytest -q
+        run: agentproof record-command self-audit.jsonl pytest -ra -o addopts=
       - name: Audit completion claim
         run: |
           printf 'All tests passed.\n' > final-response.txt
