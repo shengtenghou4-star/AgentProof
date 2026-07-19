@@ -11,6 +11,7 @@ The project starts from a simple rule: **do not trust completion language; verif
 - atomic claim extraction and deterministic verification;
 - test, metric, model-route, artifact, deployment, and completion checks;
 - an OpenAI-compatible route-attestation proxy that records requested and returned models without storing prompts, responses, or authorization values;
+- native privacy-preserving importers for Claude Code JSON/stream-json and OpenAI Responses objects/event streams;
 - run-level detectors for grader tampering, hidden failures, stale artifacts, mock deployment evidence, unauthorized acceptance changes, model substitution, seed cherry-picking, and data leakage;
 - explicit acceptance policies that fail CI when required evidence is missing;
 - append-only hash-chained traces and artifact integrity manifests;
@@ -32,7 +33,9 @@ agentproof gate examples/sample_trace.jsonl examples/strict-policy.json --respon
 agentproof record-command run.jsonl pytest -q
 agentproof manifest artifacts.json model.pkl report.json --root .
 agentproof verify-manifest artifacts.json --root .
-agentproof import-otel otlp.json run.jsonl
+agentproof-import claude-code claude-run.jsonl claude-evidence.jsonl
+agentproof-import openai-responses responses.jsonl openai-evidence.jsonl
+agentproof-import otel otlp.json otel-evidence.jsonl
 agentproof replay examples/replay.json --source . --json replay-report.json
 agentproof replay examples/replay.json --source . --docker-image python:3.12-slim --json container-report.json
 agentproof bundle evidence.json --trace run.jsonl --response-file final-response.txt --artifact model.pkl --root . --key-file .agentproof-key
@@ -68,12 +71,15 @@ Docker replay adds network denial, capability dropping, `no-new-privileges`, mem
 
 The route proxy provides application-layer model provenance by observing the request model, provider request ID, returned model, status, latency, and cryptographic body digests. It marks substitutions and failed calls as contradictions.
 
+Native transcript adapters normalize Claude Code and OpenAI Responses records into model, tool, and result evidence. Prompt, response, tool argument, and tool result content is stored as SHA-256 rather than plaintext.
+
 The local server exposes `/api/audit`, `/api/gate`, `/health`, and an interactive dashboard at `/`. It accepts inline evidence only and does not execute uploaded commands.
 
 ## Architecture
 
 ```text
 Agent final response ──> claim extraction ───────> atomic claims
+Runtime exports ────────> native adapters ───────> normalized evidence
 Runtime trace ─────────> event normalization ────> observed facts
 API traffic ───────────> route attestation ──────> provider/model evidence
 Runtime trace ─────────> anomaly detectors ──────> gaming findings
@@ -87,6 +93,7 @@ API/dashboard ─────────> integration surface ────> hum
 ## Documentation
 
 - `docs/model-route-attestation.md`
+- `docs/native-adapters.md`
 - `docs/threat-model.md`
 - `docs/container-replay.md`
 - `docs/benchmark.md`
@@ -95,7 +102,7 @@ API/dashboard ─────────> integration surface ────> hum
 
 ## Roadmap
 
-1. Native transcript adapters for major coding-agent runtimes.
+1. Codex and additional coding-agent transcript adapters.
 2. Multi-step and paraphrase-rich benchmark expansion.
 3. ClaimForge and Major Forest case studies.
 4. Public alpha packaging and hosted demo.
@@ -110,4 +117,4 @@ pytest
 
 ## Status
 
-AgentProof is an early alpha. It is usable for deterministic evidence audits, model-route attestation, acceptance gates, provenance verification, reproducibility checks, and local API integrations. It is not a formal security boundary.
+AgentProof is an early alpha. It is usable for deterministic evidence audits, model-route attestation, transcript normalization, acceptance gates, provenance verification, reproducibility checks, and local API integrations. It is not a formal security boundary.
