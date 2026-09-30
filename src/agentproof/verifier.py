@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from math import isclose
 
+from .evidence import terminal_candidates, terminal_conflict
 from .models import Claim, Event, Finding, FindingStatus
 
 
@@ -36,14 +37,30 @@ def _indexes(events: list[Event], event_type: str) -> list[int]:
 
 
 def _verify_tests(claim: Claim, events: list[Event]) -> Finding:
-    indexes = _indexes(events, "test_summary")
-    if not indexes:
+    expected_suite = str(claim.expected.get("suite", "")).strip()
+    candidates = [
+        (index, event)
+        for index, event in enumerate(events)
+        if event.event_type == "test_summary"
+        and (not expected_suite or str(event.data.get("suite", "")).strip() == expected_suite)
+    ]
+    if not candidates:
+        detail = f" for suite {expected_suite}" if expected_suite else ""
         return Finding(
             claim,
             FindingStatus.UNSUPPORTED,
-            "No test_summary event was recorded",
+            f"No test_summary event was recorded{detail}",
         )
-    latest = events[indexes[-1]].data
+    terminal = terminal_candidates(candidates)
+    if terminal_conflict(terminal):
+        return Finding(
+            claim,
+            FindingStatus.CONTRADICTED,
+            "Conflicting test summaries share the terminal execution timestamp",
+            tuple(index for index, _ in terminal),
+        )
+    index, event = terminal[-1]
+    latest = event.data
     failed = int(latest.get("failed", 0))
     errors = int(latest.get("errors", 0))
     exit_code = latest.get("exit_code")
@@ -53,20 +70,21 @@ def _verify_tests(claim: Claim, events: list[Event]) -> Finding:
             claim,
             FindingStatus.UNSUPPORTED,
             "A zero-test run cannot prove all tests passed",
-            (indexes[-1],),
+            (index,),
         )
     if failed == 0 and errors == 0 and exit_code == 0:
+        suite_text = f" for suite {expected_suite}" if expected_suite else ""
         return Finding(
             claim,
             FindingStatus.VERIFIED,
-            f"{total} tests passed with exit code 0",
-            (indexes[-1],),
+            f"{total} tests passed with exit code 0{suite_text}",
+            (index,),
         )
     return Finding(
         claim,
         FindingStatus.CONTRADICTED,
         f"Recorded test run has failed={failed}, errors={errors}, exit_code={exit_code}",
-        (indexes[-1],),
+        (index,),
     )
 
 
@@ -90,7 +108,15 @@ def _verify_check(claim: Claim, events: list[Event]) -> Finding:
             FindingStatus.UNSUPPORTED,
             f"No check_result event for {expected_name}",
         )
-    index, event = candidates[-1]
+    terminal = terminal_candidates(candidates)
+    if terminal_conflict(terminal):
+        return Finding(
+            claim,
+            FindingStatus.CONTRADICTED,
+            f"Conflicting check results for {expected_name} share the terminal execution timestamp",
+            tuple(index for index, _ in terminal),
+        )
+    index, event = terminal[-1]
     actual = int(event.data.get("exit_code", -1))
     passed = bool(event.data.get("passed", False))
     if passed and actual == expected_exit_code:
@@ -124,7 +150,15 @@ def _verify_metric(claim: Claim, events: list[Event]) -> Finding:
             FindingStatus.UNSUPPORTED,
             f"No metric event for {expected_name}",
         )
-    index, event = candidates[-1]
+    terminal = terminal_candidates(candidates)
+    if terminal_conflict(terminal):
+        return Finding(
+            claim,
+            FindingStatus.CONTRADICTED,
+            f"Conflicting metric observations for {expected_name} share the terminal execution timestamp",
+            tuple(index for index, _ in terminal),
+        )
+    index, event = terminal[-1]
     actual = float(event.data["value"])
     independently_computed = bool(event.data.get("independently_computed", False))
     if not isclose(actual, expected_value, rel_tol=1e-4, abs_tol=1e-4):
@@ -153,7 +187,7 @@ def _verify_model(claim: Claim, events: list[Event]) -> Finding:
         provider = str(events[index].data.get("provider", "")).lower()
         if expected_provider and provider != str(expected_provider).lower():
             continue
-        candidates.append(index)
+        candidates.append((index, events[index]))
 
     if not candidates:
         if indexes:
@@ -170,25 +204,45 @@ def _verify_model(claim: Claim, events: list[Event]) -> Finding:
             "No model_call event was recorded",
         )
 
-    index = candidates[-1]
-    data = events[index].data
-    requested = str(data.get("requested_model") or "").lower()
-    actual = str(data.get("actual_model") or data.get("model") or "").lower()
-    route_mismatch = bool(data.get("route_mismatch", False))
-    if requested and actual and requested != actual:
-        route_mismatch = True
-
-    if route_mismatch and expected_model in {requested, actual}:
+    terminal = terminal_candidates(candidates)
+    if terminal_conflict(terminal):
         return Finding(
             claim,
             FindingStatus.CONTRADICTED,
-            f"Attested route requested {requested or 'unknown'} but returned "
-            f"{actual or 'unknown'}",
+            "Conflicting model-route observations share the terminal execution timestamp",
+            tuple(index for index, _ in terminal),
+        )
+
+    index, event = terminal[-1]
+    data = event.data
+    # Model-route contract: actual_model is authoritative when present; otherwise
+    # model is the observed route. Attested evidence must also record a 2xx
+    # provider status. requested_model is intent, so a requested/observed mismatch
+    # is contradictory rather than a successful attestation.
+    requested = str(data.get("requested_model") or "").lower()
+    observed = str(data.get("actual_model") or data.get("model") or "").lower()
+    route_mismatch = bool(data.get("route_mismatch", False))
+    if requested and observed and requested != observed:
+        route_mismatch = True
+
+    if route_mismatch:
+        return Finding(
+            claim,
+            FindingStatus.CONTRADICTED,
+            f"Route requested {requested or 'unknown'} but observed {observed or 'unknown'}",
             (index,),
         )
 
+    attested = bool(data.get("attested", False))
     status_code = data.get("status_code")
-    if data.get("attested") and status_code is not None:
+    if attested:
+        if status_code is None:
+            return Finding(
+                claim,
+                FindingStatus.PARTIAL,
+                "Attested model route omitted provider response status",
+                (index,),
+            )
         numeric_status = int(status_code)
         if not 200 <= numeric_status < 300:
             return Finding(
@@ -198,25 +252,26 @@ def _verify_model(claim: Claim, events: list[Event]) -> Finding:
                 (index,),
             )
 
-    if actual == expected_model:
-        if data.get("attested") and not data.get("actual_model"):
-            return Finding(
-                claim,
-                FindingStatus.PARTIAL,
-                "Proxy observed the requested model, but upstream omitted the actual model",
-                (index,),
-            )
+    if observed == expected_model:
         reason = (
-            "Attested upstream response matched the claimed provider/model"
-            if data.get("attested")
+            "Attested provider response matched the claimed provider/model"
+            if attested
             else "Runtime model_call matched the claimed provider/model"
         )
         return Finding(claim, FindingStatus.VERIFIED, reason, (index,))
 
+    if not observed:
+        return Finding(
+            claim,
+            FindingStatus.UNSUPPORTED,
+            "Model-call evidence did not identify the observed model route",
+            (index,),
+        )
+
     return Finding(
         claim,
         FindingStatus.CONTRADICTED,
-        f"Terminal model call was {_model_label(events[index])}; expected {expected_model}",
+        f"Terminal model call was {_model_label(event)}; expected {expected_model}",
         (index,),
     )
 
@@ -241,7 +296,15 @@ def _verify_file(claim: Claim, events: list[Event]) -> Finding:
             f"No artifact event for {expected_path}",
         )
 
-    index, event = candidates[-1]
+    terminal = terminal_candidates(candidates)
+    if terminal_conflict(terminal):
+        return Finding(
+            claim,
+            FindingStatus.CONTRADICTED,
+            f"Conflicting artifact observations for {expected_path} share the terminal execution timestamp",
+            tuple(index for index, _ in terminal),
+        )
+    index, event = terminal[-1]
     exists = bool(event.data.get("exists", False))
     digest = event.data.get("sha256")
     if exists and digest:
@@ -288,7 +351,15 @@ def _verify_deployment(claim: Claim, events: list[Event]) -> Finding:
             f"No deployment healthcheck was recorded for {expected_url}",
         )
 
-    index, event = candidates[-1]
+    terminal = terminal_candidates(candidates)
+    if terminal_conflict(terminal):
+        return Finding(
+            claim,
+            FindingStatus.CONTRADICTED,
+            f"Conflicting healthchecks for {expected_url} share the terminal execution timestamp",
+            tuple(index for index, _ in terminal),
+        )
+    index, event = terminal[-1]
     status_code = int(event.data.get("status_code", 0))
     if 200 <= status_code < 300:
         return Finding(

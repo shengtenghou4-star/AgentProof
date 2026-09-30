@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import datetime
 from typing import Any
 
 from .models import Event
@@ -11,9 +12,16 @@ _STATEFUL_IDENTITIES: dict[str, tuple[str, ...]] = {
     "healthcheck": ("url",),
     "metric": ("name",),
     "model_call": ("provider",),
-    "test_summary": (),
+    "test_summary": ("suite",),
     "tool_call": ("call_id",),
     "tool_result": ("call_id",),
+}
+_NON_STATE_FIELDS = {
+    "run_id",
+    "parent_run_id",
+    "prev_hash",
+    "event_hash",
+    "source_type",
 }
 
 
@@ -44,10 +52,39 @@ def bind_events_to_run(events: list[Event], run_id: str) -> list[Event]:
     ]
 
 
-def terminal_events(events: list[Event]) -> list[Event]:
-    """Collapse repeated stateful evidence objects to their terminal observation."""
+def terminal_candidates(
+    candidates: list[tuple[int, Event]],
+) -> list[tuple[int, Event]]:
+    """Return all observations tied at the maximal execution timestamp."""
 
-    latest: dict[tuple[str, tuple[Any, ...]], int] = {}
+    if not candidates:
+        return []
+    max_key = max(_timestamp_key(event.timestamp) for _, event in candidates)
+    return [
+        (index, event)
+        for index, event in candidates
+        if _timestamp_key(event.timestamp) == max_key
+    ]
+
+
+def terminal_conflict(candidates: list[tuple[int, Event]]) -> bool:
+    """Return True when maximal-time observations disagree materially."""
+
+    terminal = terminal_candidates(candidates)
+    states = {_freeze(_material_state(event)) for _, event in terminal}
+    return len(states) > 1
+
+
+def terminal_events(events: list[Event]) -> list[Event]:
+    """Collapse stateful evidence by execution time and fail closed on equal-time ties.
+
+    For each stateful evidence identity, only observations at the maximal execution
+    timestamp are eligible. If those maximal-time observations disagree materially,
+    none of them is returned, so policy requirements cannot be satisfied by arrival
+    order. Equivalent equal-time duplicates collapse to one representative event.
+    """
+
+    grouped: dict[tuple[str, tuple[Any, ...]], list[tuple[int, Event]]] = {}
     for index, event in enumerate(events):
         fields = _STATEFUL_IDENTITIES.get(event.event_type)
         if fields is None:
@@ -56,14 +93,47 @@ def terminal_events(events: list[Event]) -> list[Event]:
             _identity_value(event.event_type, field, event.data.get(field))
             for field in fields
         )
-        latest[(event.event_type, identity)] = index
+        grouped.setdefault((event.event_type, identity), []).append((index, event))
 
-    keep = set(latest.values())
+    keep: set[int] = set()
+    for candidates in grouped.values():
+        terminal = terminal_candidates(candidates)
+        if terminal_conflict(terminal):
+            continue
+        keep.add(terminal[-1][0])
+
     return [
         event
         for index, event in enumerate(events)
         if event.event_type not in _STATEFUL_IDENTITIES or index in keep
     ]
+
+
+def _timestamp_key(value: str) -> tuple[int, Any]:
+    text = str(value)
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return (0, text)
+    return (1, parsed.timestamp())
+
+
+def _material_state(event: Event) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in event.data.items()
+        if key not in _NON_STATE_FIELDS
+    }
+
+
+def _freeze(value: Any) -> Any:
+    if isinstance(value, dict):
+        return tuple(sorted((key, _freeze(item)) for key, item in value.items()))
+    if isinstance(value, list):
+        return tuple(_freeze(item) for item in value)
+    if isinstance(value, set):
+        return tuple(sorted(_freeze(item) for item in value))
+    return value
 
 
 def _identity_value(event_type: str, field: str, value: Any) -> Any:
