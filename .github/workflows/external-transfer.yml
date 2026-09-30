@@ -1,9 +1,8 @@
 name: external-transfer-benchmark
 
+# Full external-transfer validation runs on Muse/local compute under the zero-cost policy.
+# This file is retained only as a manual historical recipe.
 on:
-  push:
-    branches:
-      - "agentproof/external-transfer-20260929"
   workflow_dispatch:
 
 permissions:
