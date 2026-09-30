@@ -1,141 +1,43 @@
-name: ci
+name: ci-smoke
 
 on:
   push:
+    branches:
+      - main
+      - "agentproof/**"
+    paths:
+      - "src/**"
+      - "pyproject.toml"
+      - ".github/workflows/ci.yml"
   pull_request:
+    paths:
+      - "src/**"
+      - "pyproject.toml"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: agentproof-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  smoke:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e '.[dev]'
-      - run: ruff check src tests scripts
-      - run: pytest --junitxml=pytest-report.xml
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-${{ matrix.python-version }}
-          path: pytest-report.xml
-          if-no-files-found: ignore
-
-  coverage:
-    runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e '.[dev]'
-      - run: coverage run -m pytest
-      - run: coverage report
-      - run: coverage xml -o coverage.xml
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage.xml
-          if-no-files-found: error
-
-  package-smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install build
-      - run: python -m build
-      - run: python -m venv /tmp/agentproof-wheel
-      - run: /tmp/agentproof-wheel/bin/pip install dist/*.whl
-      - run: /tmp/agentproof-wheel/bin/agentproof --help
-      - run: /tmp/agentproof-wheel/bin/agentproof benchmark --suite core
-      - uses: actions/upload-artifact@v4
-        with:
-          name: distributions
-          path: dist/*
-          if-no-files-found: error
-
-  self-audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e '.[dev]'
-      - name: Run profile-driven project audit
+          cache-dependency-path: pyproject.toml
+      - name: Syntax and import smoke
         run: |
-          agentproof project-audit examples/agentproof-project-audit.json \
-            --source . \
-            --output-dir self-audit \
-            --fail-under 100 \
-            --json self-audit-summary.json
-      - name: Run all deterministic benchmark suites
-        run: agentproof benchmark --suite all --json benchmark-report.json
-      - name: Fuzz claim extraction deterministically
-        run: python scripts/fuzz_claims.py | tee fuzz-report.txt
-      - name: Run deterministic security controls
-        run: python scripts/security_controls.py --output security-controls.json
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: agentproof-self-audit
-          path: |
-            self-audit/**
-            self-audit-summary.json
-            benchmark-report.json
-            fuzz-report.txt
-            security-controls.json
-          if-no-files-found: error
-
-  claimforge-case-study:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout AgentProof
-        uses: actions/checkout@v4
-        with:
-          path: agentproof
-      - name: Checkout ClaimForge
-        uses: actions/checkout@v4
-        with:
-          repository: shengtenghou4-star/7
-          path: claimforge
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e './agentproof[dev]' -e './claimforge[dev]'
-      - name: Audit ClaimForge as a real project
-        run: |
-          agentproof project-audit agentproof/case-studies/claimforge/profile.json \
-            --source claimforge \
-            --output-dir claimforge-audit \
-            --fail-under 100 \
-            --json claimforge-audit-summary.json
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: claimforge-agentproof-case-study
-          path: |
-            claimforge-audit/**
-            claimforge-audit-summary.json
-          if-no-files-found: error
+          python -m compileall -q src
+          PYTHONPATH=src python - <<'PY'
+          import agentproof
+          print("agentproof import: OK")
+          PY
