@@ -225,3 +225,32 @@ The next product gates are:
    - bind `all_tests_passed` structured claims to an explicit suite identity when provided, rather than relying solely on policy for object identity.
 
 Any fixes must be evaluated in a separately preregistered v3/revision benchmark. The v2 harness and results must not be edited to make this run pass.
+
+
+## CI infrastructure note
+
+The results commit triggered GitHub Actions run `36658118237`.
+
+All seven CI jobs (`package-smoke`, `self-audit`, Python 3.10/3.11/3.12 tests, `coverage`, and `claimforge-case-study`) completed with conclusion `failure`, but the jobs contained no executable step records (`steps=null`) and no retrievable job log object. A direct log retrieval returned `BlobNotFound`.
+
+This matches the no-step infrastructure failure mode observed during v1. It is therefore recorded as a GitHub Actions infrastructure failure, not as a product-code or benchmark failure.
+
+Because the CI jobs never executed, this run does **not** establish a full repository test-suite pass. The locally executed evidence for this round is limited to the exact-source v1/v2 benchmark runs and the eight targeted transfer-safety tests described above.
+
+## V1 branch preservation audit note
+
+This round did not write product fixes, v2 files, or v2 results to `agentproof/external-transfer-20260929`.
+
+A final branch audit nevertheless found that the v1 branch had received two concurrent workflow-only commits after the scientific v1 result commit `becd3dea488b58398c846dd1080958838d124a5e`:
+
+- `b438bce8e66d29693570bf2a57113173b546842f` — `Zero-cost: collapse branch CI to one smoke job`;
+- `c3e9fe97f3f5945f36e2606327b80851f21e8981` — `Zero-cost: offload external transfer benchmark from push Actions`.
+
+The compare against `becd3dea...` shows changes only to:
+
+- `.github/workflows/ci.yml`;
+- `.github/workflows/external-transfer.yml`.
+
+No v1 preregistration, v1 harness, v1 results report, or v1 machine-readable verdict artifact appears in that diff. The v1 scientific result remains anchored to the immutable commit `becd3dea...`; the branch ref itself is therefore no longer bit-for-bit identical to its state at v1 sealing.
+
+No main-branch merge or public release was performed in this round.
