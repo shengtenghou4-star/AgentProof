@@ -1,0 +1,37 @@
+name: external-transfer-benchmark
+
+on:
+  push:
+    branches:
+      - "agentproof/external-transfer-20260929"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e .
+      - run: python -m py_compile external_benchmark/run_transfer_benchmark.py
+      - name: Run preregistered external transfer benchmark
+        run: |
+          python external_benchmark/run_transfer_benchmark.py \
+            --output external_benchmark/external-transfer-result.json \
+            | tee external_benchmark/external-transfer-summary.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agentproof-external-transfer-v1
+          path: |
+            external_benchmark/PREREGISTRATION.md
+            external_benchmark/external-transfer-result.json
+            external_benchmark/external-transfer-summary.txt
+          if-no-files-found: error
