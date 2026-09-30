@@ -284,3 +284,31 @@ It does not establish:
 - usable zero-shot raw-format transfer, since the generic adapter still rejected all v3 safe controls.
 
 The original v1 and v2 negative evidence remains part of the scientific record and is not superseded by the v3 PASS.
+
+
+## CI infrastructure note
+
+The v3 results commit triggered GitHub Actions run `36661000237`.
+
+All seven repository CI jobs (`package-smoke`, `self-audit`, Python 3.10/3.11/3.12 tests, `coverage`, and `claimforge-case-study`) completed with conclusion `failure`, but every job returned `steps=null` and no executable step record.
+
+This is the same no-step infrastructure failure mode previously observed during v1 and v2. It is recorded as a GitHub Actions infrastructure failure, not as a scientific benchmark failure or as evidence that repository tests executed and failed.
+
+Accordingly, this round does **not** claim a full repository CI pass. The executed local test evidence is the exact-source **17/17 targeted transfer-safety tests**, plus the deterministic v1, v2, and v3 benchmark executions described above.
+
+## Preservation and private-branch audit
+
+The inherited frozen v2 evidence was checked on the v3 result branch after execution.
+
+The blobs remain exactly:
+
+- v2 preregistration: `dc7fc3e55ff897c8c792d1e38b87d81c6a33003f`;
+- v2 frozen harness: `24a76cf15a54889174c74751069586e8d489b676`;
+- v2 final results report: `4f864684e2556c3a9f3f451199523933c5e4dfc7`;
+- v2 machine-readable verdict gzip: `161331e44ccf892557593212e9dc3fd8a2a4ef80`.
+
+The compare from v2 final audit commit `ee7fb7a3443c5d1705a6935dcbf821561ed81941` to the v3 result commit contains the third-round product fixes/tests plus new v3 regression/v3 benchmark files only. It contains no modification to any `external_benchmark/v2/` file.
+
+The repository `main` ref remained `5af0e72fdc9b41edef38e5c62692f4702948e681` at final audit. No merge to main and no public release was performed.
+
+The original v2 FAIL and all of its recorded hashes therefore remain unchanged.
