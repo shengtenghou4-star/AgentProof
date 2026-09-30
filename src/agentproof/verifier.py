@@ -148,66 +148,76 @@ def _verify_model(claim: Claim, events: list[Event]) -> Finding:
     expected_model = str(claim.expected.get("model", "")).lower()
     expected_provider = claim.expected.get("provider")
 
-    for index in reversed(indexes):
-        data = events[index].data
-        provider = str(data.get("provider", "")).lower()
-        provider_matches = not expected_provider or provider == str(expected_provider).lower()
-        if not provider_matches:
+    candidates = []
+    for index in indexes:
+        provider = str(events[index].data.get("provider", "")).lower()
+        if expected_provider and provider != str(expected_provider).lower():
             continue
+        candidates.append(index)
 
-        requested = str(data.get("requested_model") or "").lower()
-        actual = str(data.get("actual_model") or data.get("model") or "").lower()
-        route_mismatch = bool(data.get("route_mismatch", False))
-        if requested and actual and requested != actual:
-            route_mismatch = True
-
-        if route_mismatch and expected_model in {requested, actual}:
+    if not candidates:
+        if indexes:
+            seen = [_model_label(events[index]) for index in indexes]
             return Finding(
                 claim,
                 FindingStatus.CONTRADICTED,
-                f"Attested route requested {requested or 'unknown'} but returned "
-                f"{actual or 'unknown'}",
-                (index,),
+                f"Observed model calls were: {', '.join(seen)}",
+                tuple(indexes),
             )
+        return Finding(
+            claim,
+            FindingStatus.UNSUPPORTED,
+            "No model_call event was recorded",
+        )
 
-        status_code = data.get("status_code")
-        if data.get("attested") and status_code is not None:
-            numeric_status = int(status_code)
-            if not 200 <= numeric_status < 300:
-                return Finding(
-                    claim,
-                    FindingStatus.CONTRADICTED,
-                    f"Attested provider call failed with HTTP {numeric_status}",
-                    (index,),
-                )
+    index = candidates[-1]
+    data = events[index].data
+    requested = str(data.get("requested_model") or "").lower()
+    actual = str(data.get("actual_model") or data.get("model") or "").lower()
+    route_mismatch = bool(data.get("route_mismatch", False))
+    if requested and actual and requested != actual:
+        route_mismatch = True
 
-        if actual == expected_model:
-            if data.get("attested") and not data.get("actual_model"):
-                return Finding(
-                    claim,
-                    FindingStatus.PARTIAL,
-                    "Proxy observed the requested model, but upstream omitted the actual model",
-                    (index,),
-                )
-            reason = (
-                "Attested upstream response matched the claimed provider/model"
-                if data.get("attested")
-                else "Runtime model_call matched the claimed provider/model"
-            )
-            return Finding(claim, FindingStatus.VERIFIED, reason, (index,))
-
-    if indexes:
-        seen = [_model_label(events[index]) for index in indexes]
+    if route_mismatch and expected_model in {requested, actual}:
         return Finding(
             claim,
             FindingStatus.CONTRADICTED,
-            f"Observed model calls were: {', '.join(seen)}",
-            tuple(indexes),
+            f"Attested route requested {requested or 'unknown'} but returned "
+            f"{actual or 'unknown'}",
+            (index,),
         )
+
+    status_code = data.get("status_code")
+    if data.get("attested") and status_code is not None:
+        numeric_status = int(status_code)
+        if not 200 <= numeric_status < 300:
+            return Finding(
+                claim,
+                FindingStatus.CONTRADICTED,
+                f"Attested provider call failed with HTTP {numeric_status}",
+                (index,),
+            )
+
+    if actual == expected_model:
+        if data.get("attested") and not data.get("actual_model"):
+            return Finding(
+                claim,
+                FindingStatus.PARTIAL,
+                "Proxy observed the requested model, but upstream omitted the actual model",
+                (index,),
+            )
+        reason = (
+            "Attested upstream response matched the claimed provider/model"
+            if data.get("attested")
+            else "Runtime model_call matched the claimed provider/model"
+        )
+        return Finding(claim, FindingStatus.VERIFIED, reason, (index,))
+
     return Finding(
         claim,
-        FindingStatus.UNSUPPORTED,
-        "No model_call event was recorded",
+        FindingStatus.CONTRADICTED,
+        f"Terminal model call was {_model_label(events[index])}; expected {expected_model}",
+        (index,),
     )
 
 
@@ -219,60 +229,78 @@ def _model_label(event: Event) -> str:
 
 def _verify_file(claim: Claim, events: list[Event]) -> Finding:
     expected_path = str(claim.expected["path"])
-    for index, event in enumerate(events):
-        if event.event_type != "artifact":
-            continue
-        if event.data.get("path") == expected_path:
-            exists = bool(event.data.get("exists", False))
-            digest = event.data.get("sha256")
-            if exists and digest:
-                return Finding(
-                    claim,
-                    FindingStatus.VERIFIED,
-                    "Artifact exists and has a recorded SHA-256 digest",
-                    (index,),
-                )
-            if exists:
-                return Finding(
-                    claim,
-                    FindingStatus.PARTIAL,
-                    "Artifact exists but has no integrity digest",
-                    (index,),
-                )
-            return Finding(
-                claim,
-                FindingStatus.CONTRADICTED,
-                "Artifact event reports that the file does not exist",
-                (index,),
-            )
-    return Finding(
-        claim,
-        FindingStatus.UNSUPPORTED,
-        f"No artifact event for {expected_path}",
-    )
-
-
-def _verify_deployment(claim: Claim, events: list[Event]) -> Finding:
-    indexes = _indexes(events, "healthcheck")
-    if not indexes:
+    candidates = [
+        (index, event)
+        for index, event in enumerate(events)
+        if event.event_type == "artifact" and event.data.get("path") == expected_path
+    ]
+    if not candidates:
         return Finding(
             claim,
             FindingStatus.UNSUPPORTED,
-            "No deployment healthcheck was recorded",
+            f"No artifact event for {expected_path}",
         )
-    index = indexes[-1]
-    status_code = int(events[index].data.get("status_code", 0))
-    if 200 <= status_code < 300:
+
+    index, event = candidates[-1]
+    exists = bool(event.data.get("exists", False))
+    digest = event.data.get("sha256")
+    if exists and digest:
         return Finding(
             claim,
             FindingStatus.VERIFIED,
-            f"Healthcheck returned HTTP {status_code}",
+            "Terminal artifact exists and has a recorded SHA-256 digest",
+            (index,),
+        )
+    if exists:
+        return Finding(
+            claim,
+            FindingStatus.PARTIAL,
+            "Terminal artifact exists but has no integrity digest",
             (index,),
         )
     return Finding(
         claim,
         FindingStatus.CONTRADICTED,
-        f"Healthcheck returned HTTP {status_code}",
+        "Terminal artifact event reports that the file does not exist",
+        (index,),
+    )
+
+
+def _verify_deployment(claim: Claim, events: list[Event]) -> Finding:
+    expected_url = str(claim.expected.get("url", "")).strip()
+    if not expected_url:
+        return Finding(
+            claim,
+            FindingStatus.UNSUPPORTED,
+            "Deployment claim did not define an expected URL",
+        )
+
+    candidates = [
+        (index, event)
+        for index, event in enumerate(events)
+        if event.event_type == "healthcheck"
+        and str(event.data.get("url", "")).strip() == expected_url
+    ]
+    if not candidates:
+        return Finding(
+            claim,
+            FindingStatus.UNSUPPORTED,
+            f"No deployment healthcheck was recorded for {expected_url}",
+        )
+
+    index, event = candidates[-1]
+    status_code = int(event.data.get("status_code", 0))
+    if 200 <= status_code < 300:
+        return Finding(
+            claim,
+            FindingStatus.VERIFIED,
+            f"Healthcheck for {expected_url} returned HTTP {status_code}",
+            (index,),
+        )
+    return Finding(
+        claim,
+        FindingStatus.CONTRADICTED,
+        f"Healthcheck for {expected_url} returned HTTP {status_code}",
         (index,),
     )
 

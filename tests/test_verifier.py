@@ -67,7 +67,7 @@ def test_artifact_needs_digest_for_full_verification():
 
 def test_failed_healthcheck_contradicts_deployment():
     result = finding_for(
-        "The API is deployed",
-        [event("healthcheck", status_code=503)],
+        'AGENTPROOF_CLAIM {"kind":"deployed","expected":{"url":"https://api.example/health"}}',
+        [event("healthcheck", url="https://api.example/health", status_code=503)],
     )
     assert result.status == FindingStatus.CONTRADICTED

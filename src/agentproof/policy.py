@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from .evidence import bind_events_to_run, explicit_run_ids, terminal_events
 from .models import AuditReport, Event, FindingStatus
 
 
@@ -33,6 +34,18 @@ def load_policy(path: Path) -> dict[str, Any]:
 
 def evaluate_policy(report: AuditReport, events: list[Event], policy: dict[str, Any]) -> PolicyResult:
     checks: list[PolicyCheck] = []
+    run_ids = explicit_run_ids(events)
+    scoped_events = bind_events_to_run(events, report.run_id)
+    effective_events = terminal_events(scoped_events)
+
+    if run_ids:
+        checks.append(
+            PolicyCheck(
+                "run_scope",
+                bool(scoped_events),
+                f"target_run={report.run_id}, scoped_events={len(scoped_events)}, observed_runs={len(run_ids)}",
+            )
+        )
 
     minimum_score = float(policy.get("minimum_score", 0))
     checks.append(PolicyCheck("minimum_score", report.score >= minimum_score, f"score={report.score}, required>={minimum_score}"))
@@ -53,7 +66,7 @@ def evaluate_policy(report: AuditReport, events: list[Event], policy: dict[str, 
         checks.append(_check_claim_requirement(report, requirement, index))
 
     for index, requirement in enumerate(policy.get("required_events", [])):
-        checks.append(_check_event_requirement(events, requirement, index))
+        checks.append(_check_event_requirement(effective_events, requirement, index))
 
     return PolicyResult(passed=all(check.passed for check in checks), checks=checks)
 
