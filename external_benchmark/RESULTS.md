@@ -89,11 +89,15 @@ The full 384-evaluation JSON was executed four times locally. All four uncompres
 
 `SHA-256 73dcaf5de8ca5b93c64ee254f7b7b4681663e11e655d6334bbdfa73a17d7b723`
 
-Uncompressed size: 624,098 bytes.
+Uncompressed full JSON size: 624,098 bytes.
 
-The committed gzip contains that raw JSON:
-- gzip SHA-256: `1102e7c58241a9c8e0365080efe1c2fc9105e8bc825ea5fa750e3f5ccf8dcf28`
-- decompress and verify the uncompressed SHA above.
+The repository retains a compressed machine-readable verdict table covering all 384 evaluations:
+- file: `external_benchmark/external-transfer-verdicts.csv.gz`
+- uncompressed CSV rows: 385 including header
+- uncompressed CSV SHA-256: `0cca9cfe432f297f66dc57b3a90f491b9563770313194281992bed678e104a6c`
+- gzip SHA-256: `14baea19d009d0f27a035c485a01823fd03b589a110676c72ef3a2f829a37fbd`
+
+The full JSON is retained as the execution artifact for this run and is identified by the SHA-256 above. The verdict table is the durable repository copy used for case-level review.
 
 Before execution, the local copies of every product source file actually used by this benchmark plus the harness were checked against their GitHub Git-blob SHA values; all matched the frozen repository versions. A minimal local `adapters/__init__.py` import shim was used only to avoid importing unrelated adapters; the tested `agent_traces.py` was the exact frozen blob.
 
