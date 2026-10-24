@@ -1,7 +1,7 @@
 # AgentProof
 
-[![CI](https://github.com/shengtenghou4-star/8/actions/workflows/ci.yml/badge.svg)](https://github.com/shengtenghou4-star/8/actions/workflows/ci.yml)
-[![Live Demo](https://img.shields.io/badge/live-demo-5ee7ff)](https://shengtenghou4-star.github.io/8/)
+[![CI](https://github.com/shengtenghou4-star/AgentProof/actions/workflows/ci.yml/badge.svg)](https://github.com/shengtenghou4-star/AgentProof/actions/workflows/ci.yml)
+[![Live Demo](https://img.shields.io/badge/live-demo-5ee7ff)](https://shengtenghou4-star.github.io/AgentProof/)
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
 ![Version](https://img.shields.io/badge/version-0.5.0-orange)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
@@ -12,7 +12,7 @@ AgentProof checks whether an agent's final claims are supported by observable ex
 
 > **Do not trust completion language. Verify external facts.**
 
-**[Open the interactive demo →](https://shengtenghou4-star.github.io/8/)** · **[Inspect the evidence claims matrix →](docs/EVIDENCE_CLAIMS.md)** · **[Read the coding-stage completion boundary →](docs/INTERNAL_COMPLETION.md)**
+**[Open the interactive demo →](https://shengtenghou4-star.github.io/AgentProof/)** · **[Inspect the evidence claims matrix →](docs/EVIDENCE_CLAIMS.md)** · **[Read the coding-stage completion boundary →](docs/INTERNAL_COMPLETION.md)**
 
 ## Validated evidence at a glance
 

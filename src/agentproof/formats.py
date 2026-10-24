@@ -58,7 +58,7 @@ def render_sarif(report: AuditReport) -> str:
                 "tool": {
                     "driver": {
                         "name": "AgentProof",
-                        "informationUri": "https://github.com/shengtenghou4-star/8",
+                        "informationUri": "https://github.com/shengtenghou4-star/AgentProof",
                         "rules": list(rules.values()),
                     }
                 },

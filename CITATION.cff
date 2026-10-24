@@ -5,8 +5,8 @@ type: software
 authors:
   - family-names: Hou
     given-names: Shengteng
-repository-code: "https://github.com/shengtenghou4-star/8"
-url: "https://shengtenghou4-star.github.io/8/"
+repository-code: "https://github.com/shengtenghou4-star/AgentProof"
+url: "https://shengtenghou4-star.github.io/AgentProof/"
 license: Apache-2.0
 version: 0.5.0
 date-released: 2026-07-19
